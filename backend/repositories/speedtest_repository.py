@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from datetime import datetime
+from itertools import groupby
 from models.speedtest import SpeedTestResult, SpeedTestFailure
 
 
@@ -95,3 +96,75 @@ def get_history(db: Session, from_dt: datetime, to_dt: datetime) -> dict:
         .all()
     )
     return {"results": results, "failures": failures}
+
+def get_incidents(db: Session, from_dt: datetime, to_dt: datetime) -> list:
+    """
+    Return a list of incidents within the given time range.
+
+    An incident is a consecutive sequence of records where performance is
+    not NORMAL (DEGRADED or CRITICAL) or a SpeedTestFailure. Each incident
+    is collapsed into a single event with start time, end time, duration,
+    type, and average metrics where available.
+    """
+    results = (
+        db.query(SpeedTestResult)
+        .filter(SpeedTestResult.timestamp >= from_dt)
+        .filter(SpeedTestResult.timestamp <= to_dt)
+        .order_by(SpeedTestResult.timestamp.asc())
+        .all()
+    )
+    failures = (
+        db.query(SpeedTestFailure)
+        .filter(SpeedTestFailure.timestamp >= from_dt)
+        .filter(SpeedTestFailure.timestamp <= to_dt)
+        .order_by(SpeedTestFailure.timestamp.asc())
+        .all()
+    )
+
+    # Build unified timeline tagging each record with its incident type
+    events = []
+    for r in results:
+        if r.performance_status != "NORMAL":
+            events.append({
+                "timestamp": r.timestamp,
+                "type": r.performance_status,
+                "download_mbps": r.download_mbps,
+                "upload_mbps": r.upload_mbps,
+                "ping": r.ping,
+            })
+    for f in failures:
+        events.append({
+            "timestamp": f.timestamp,
+            "type": "FAILURE",
+            "download_mbps": None,
+            "upload_mbps": None,
+            "ping": None,
+        })
+
+    if not events:
+        return []
+
+    # Sort by timestamp and group consecutive events of the same type
+    events.sort(key=lambda e: e["timestamp"])
+
+    incidents = []
+    for _, group in groupby(events, key=lambda e: e["type"]):
+        group = list(group)
+        downloads = [e["download_mbps"] for e in group if e["download_mbps"] is not None]
+        uploads = [e["upload_mbps"] for e in group if e["upload_mbps"] is not None]
+        pings = [e["ping"] for e in group if e["ping"] is not None]
+
+        incidents.append({
+            "type": group[0]["type"],
+            "start": group[0]["timestamp"],
+            "end": group[-1]["timestamp"],
+            "duration_minutes": round(
+                (group[-1]["timestamp"] - group[0]["timestamp"]).total_seconds() / 60
+            ),
+            "sample_count": len(group),
+            "avg_download_mbps": round(sum(downloads) / len(downloads), 2) if downloads else None,
+            "avg_upload_mbps": round(sum(uploads) / len(uploads), 2) if uploads else None,
+            "avg_ping": round(sum(pings) / len(pings), 2) if pings else None,
+        })
+
+    return incidents

@@ -36,3 +36,11 @@ def get_history(db: Session, from_dt: datetime, to_dt: datetime) -> dict:
     Delegates to the speedtest repository.
     """
     return repo.get_history(db, from_dt, to_dt)
+
+def get_incidents(db: Session, from_dt: datetime, to_dt: datetime) -> list:
+    """
+    Return grouped incidents within the given time range.
+
+    Delegates to the speedtest repository.
+    """
+    return repo.get_incidents(db, from_dt, to_dt)

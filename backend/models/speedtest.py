@@ -37,6 +37,11 @@ class SpeedTestResult(SpeedTestMixin, Base):
     Maps to the 'speedtest_results' table. Only rows where the test completed
     successfully (status == 'ONLINE') and all performance metrics are present
     should be inserted here.
+
+    Performance classification thresholds (Drei MyLife FIX Data 150):
+        NORMAL:   download >= 75 Mbps and upload >= 5 Mbps
+        DEGRADED: download >= 30 Mbps or upload >= 2 Mbps, below NORMAL
+        CRITICAL: download < 30 Mbps or upload < 2 Mbps
     """
 
     __tablename__ = "speedtest_results"
@@ -49,6 +54,14 @@ class SpeedTestResult(SpeedTestMixin, Base):
 
     upload_mbps = Column(Float, nullable=False)
     """Upload speed in megabits per second."""
+
+    performance_status = Column(String, nullable=False, default="NORMAL")
+    """
+    Performance classification at time of recording:
+        - 'NORMAL'   — above guaranteed minimums
+        - 'DEGRADED' — below guarantee but functional
+        - 'CRITICAL' — severely underperforming
+    """
 
 
 class SpeedTestFailure(SpeedTestMixin, Base):

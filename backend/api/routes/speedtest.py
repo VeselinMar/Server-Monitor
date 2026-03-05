@@ -6,7 +6,7 @@ from datetime import datetime
 from schemas.speedtest import SpeedTestResultResponse, SpeedTestFailureResponse
 from core.database import SessionLocal
 from services.ingest_speedtest import ingest_speedtest
-from services.speedtest_service import get_latest, get_counts, get_latest_timestamp, get_history
+from services.speedtest_service import get_latest, get_counts, get_latest_timestamp, get_history, get_incidents
 
 router = APIRouter(prefix="/speedtest", tags=["Speedtest"])
 
@@ -89,4 +89,23 @@ def history(
     Returns results and failures separately so the frontend can
     distinguish successful tests from failed ones on the same timeline.
     """
-    return get_history(db, from_dt, to_dt)    
+    return get_history(db, from_dt, to_dt)
+
+@router.get(
+    "/incidents",
+    summary="Get grouped performance incidents within a time range",
+    response_description="List of outage and degradation incidents with duration and average metrics",
+)
+def incidents(
+    from_dt: datetime,
+    to_dt: datetime,
+    db: Session = Depends(get_db),
+):
+    """
+    Return grouped incidents between from_dt and to_dt.
+
+    Consecutive DEGRADED, CRITICAL, or FAILURE records are collapsed into
+    single incidents with start time, end time, duration, and average metrics.
+    Useful for ISP complaint reporting.
+    """
+    return get_incidents(db, from_dt, to_dt)

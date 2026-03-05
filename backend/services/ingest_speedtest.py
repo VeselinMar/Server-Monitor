@@ -9,6 +9,11 @@ from pathlib import Path
 
 LOG_PATH = Path("/mnt/media/monitoring/data/speedtest.csv")
 
+DOWNLOAD_DEGRADED = 75.0   # Drei guaranteed minimum (50% of 150 Mbps)
+DOWNLOAD_CRITICAL = 30.0
+UPLOAD_DEGRADED = 5.0
+UPLOAD_CRITICAL = 2.0
+
 COLUMNS = [
     "timestamp",
     "status",
@@ -23,6 +28,18 @@ COLUMNS = [
 
 NUMERIC_COLS = ["ping", "download_mbps", "upload_mbps", "server_id", "distance"]
 
+def classify_speed(download_mbps: float, upload_mbps: float) -> str:
+    """
+    Classify a speed test result based on Drei MyLife FIX Data 150 thresholds.
+
+    Returns 'CRITICAL' if either metric is severely below contracted levels,
+    'DEGRADED' if below the guaranteed minimum, or 'NORMAL' otherwise.
+    """
+    if download_mbps < DOWNLOAD_CRITICAL or upload_mbps < UPLOAD_CRITICAL:
+        return "CRITICAL"
+    elif download_mbps < DOWNLOAD_DEGRADED or upload_mbps < UPLOAD_DEGRADED:
+        return "DEGRADED"
+    return "NORMAL"
 
 def _columns_for(model) -> set:
     """Return the set of column names defined on a SQLAlchemy model."""
@@ -35,6 +52,7 @@ def _sanitise(data: dict) -> dict:
         k: (None if isinstance(v, float) and math.isnan(v) else v)
         for k, v in data.items()
     }
+
 def ingest_speedtest():
     """
     Read the speed test CSV log and insert only records newer than the latest
@@ -99,9 +117,9 @@ def ingest_speedtest():
                 ))
             else:
                 db.add(SpeedTestResult(
-                    **{k: v for k, v in data.items() if k in _columns_for(SpeedTestResult)},
-                ))
-
+                **{k: v for k, v in data.items() if k in _columns_for(SpeedTestResult)},
+                performance_status=classify_speed(row["download_mbps"], row["upload_mbps"]),
+            ))
         db.commit()
     except Exception:
         db.rollback()
