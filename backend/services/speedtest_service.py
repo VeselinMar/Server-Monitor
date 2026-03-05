@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from datetime import datetime
 from repositories import speedtest_repository as repo
 
 
@@ -27,3 +28,11 @@ def get_latest_timestamp(db: Session):
     Delegates to the speedtest repository.
     """
     return repo.get_latest_timestamp(db)
+
+def get_history(db: Session, from_dt: datetime, to_dt: datetime) -> dict:
+    """
+    Return all speed test records within the given time range.
+
+    Delegates to the speedtest repository.
+    """
+    return repo.get_history(db, from_dt, to_dt)

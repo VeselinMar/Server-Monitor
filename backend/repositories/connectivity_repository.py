@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from datetime import datetime
 from models.connectivity import ConnectivityCheck
 
 
@@ -47,3 +48,18 @@ def get_counts(db: Session) -> dict:
         "offline": offline,
         "total": online + offline,
     }
+
+from datetime import datetime
+
+def get_history(db: Session, from_dt: datetime, to_dt: datetime) -> list:
+    """
+    Return all connectivity check records within the given time range,
+    ordered chronologically.
+    """
+    return (
+        db.query(ConnectivityCheck)
+        .filter(ConnectivityCheck.timestamp >= from_dt)
+        .filter(ConnectivityCheck.timestamp <= to_dt)
+        .order_by(ConnectivityCheck.timestamp.asc())
+        .all()
+    )

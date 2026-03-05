@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from datetime import datetime
 from models.speedtest import SpeedTestResult, SpeedTestFailure
 
 
@@ -71,3 +72,26 @@ def get_latest_timestamp(db: Session):
         return latest_result
 
     return max(latest_result, latest_failure)
+
+def get_history(db: Session, from_dt: datetime, to_dt: datetime) -> dict:
+    """
+    Return all speed test records within the given time range.
+    Queries both SpeedTestResult and SpeedTestFailure, returning them
+    separately so the frontend can plot successes and mark failures
+    distinctly on the same timeline.
+    """
+    results = (
+        db.query(SpeedTestResult)
+        .filter(SpeedTestResult.timestamp >= from_dt)
+        .filter(SpeedTestResult.timestamp <= to_dt)
+        .order_by(SpeedTestResult.timestamp.asc())
+        .all()
+    )
+    failures = (
+        db.query(SpeedTestFailure)
+        .filter(SpeedTestFailure.timestamp >= from_dt)
+        .filter(SpeedTestFailure.timestamp <= to_dt)
+        .order_by(SpeedTestFailure.timestamp.asc())
+        .all()
+    )
+    return {"results": results, "failures": failures}

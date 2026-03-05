@@ -1,10 +1,11 @@
 from typing import Union
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from datetime import datetime
 
 from core.database import SessionLocal
 from schemas.connectivity import ConnectivityCheckResponse
-from services.connectivity_service import get_latest, get_counts
+from services.connectivity_service import get_latest, get_counts, get_history
 from services.ingest_connectivity import ingest_connectivity
 
 router = APIRouter(prefix="/connectivity", tags=["Connectivity"])
@@ -69,3 +70,21 @@ def ingest():
     """
     ingest_connectivity()
     return {"status": "ingested"}
+
+@router.get(
+    "/history",
+    summary="Get connectivity check records within a time range",
+    response_description="All connectivity checks within the given time range",
+)
+def history(
+    from_dt: datetime,
+    to_dt: datetime,
+    db: Session = Depends(get_db),
+):
+    """
+    Return all connectivity check records between from_dt and to_dt.
+
+    Both parameters are required and should be ISO 8601 timestamps.
+    Results are ordered chronologically.
+    """
+    return get_history(db, from_dt, to_dt)

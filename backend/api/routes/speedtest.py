@@ -1,11 +1,12 @@
 from typing import Union
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from datetime import datetime
 
 from schemas.speedtest import SpeedTestResultResponse, SpeedTestFailureResponse
 from core.database import SessionLocal
 from services.ingest_speedtest import ingest_speedtest
-from services.speedtest_service import get_latest, get_counts
+from services.speedtest_service import get_latest, get_counts, get_latest_timestamp, get_history
 
 router = APIRouter(prefix="/speedtest", tags=["Speedtest"])
 
@@ -70,3 +71,22 @@ def ingest():
     """
     ingest_speedtest()
     return {"status": "ingested"}
+
+@router.get(
+    "/history",
+    summary="Get speed test records within a time range",
+    response_description="All speed test results and failures within the given time range",
+)
+def history(
+    from_dt: datetime,
+    to_dt: datetime,
+    db: Session = Depends(get_db),
+):
+    """
+    Return all speed test records between from_dt and to_dt.
+
+    Both parameters are required and should be ISO 8601 timestamps.
+    Returns results and failures separately so the frontend can
+    distinguish successful tests from failed ones on the same timeline.
+    """
+    return get_history(db, from_dt, to_dt)    
