@@ -150,10 +150,10 @@ backend/
 │   ├── config.py
 │   └── database.py
 ├── models/
-│   ├── speedtest.py                 # SpeedTestResult, SpeedTestFailure
-│   ├── connectivity.py              # ConnectivityCheck
-│   ├── daily_summary.py             # DailySummary
-│   └── settings.py                  # Setting (key-value store)
+│   ├── speedtest.py
+│   ├── connectivity.py
+│   ├── daily_summary.py
+│   └── settings.py
 ├── repositories/
 │   ├── speedtest_repository.py
 │   ├── connectivity_repository.py
