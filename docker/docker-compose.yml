@@ -1,0 +1,29 @@
+services:
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: ../docker/backend.dockerfile
+    container_name: servermonitor-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: sqlite:////data/monitoring.db
+    volumes:
+      - /mnt/media/monitoring/data:/data
+    networks:
+      - proxy-network
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: ../docker/frontend.dockerfile
+    container_name: servermonitor-frontend
+    restart: unless-stopped
+    networks:
+      - proxy-network
+    depends_on:
+      - backend
+
+networks:
+  proxy-network:
+    external: true

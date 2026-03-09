@@ -34,6 +34,7 @@ frontend/dist/
 *.local
 frontend/.env
 frontend/.env.*
+.evn.local
 
 # IDE
 .idea/
