@@ -1,5 +1,5 @@
 from typing import Union
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from datetime import datetime
 
@@ -7,6 +7,7 @@ from schemas.speedtest import SpeedTestResultResponse, SpeedTestFailureResponse
 from core.database import SessionLocal
 from services.ingest_speedtest import ingest_speedtest
 from services.speedtest_service import get_latest, get_counts, get_latest_timestamp, get_history, get_incidents
+from services.aggregation_service import aggregate_old_records
 
 router = APIRouter(prefix="/speedtest", tags=["Speedtest"])
 
@@ -61,15 +62,17 @@ def count(db: Session = Depends(get_db)):
     summary="Ingest speed test results from the CSV log",
     response_description="A status message confirming the speed test data was ingested",
 )
-def ingest():
+def ingest(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """
     Parse the speed test CSV log and persist records to the database.
 
     Reads from the configured log file, coerces numeric fields, and routes
-    each row to either SpeedTestResult or SpeedTestFailure. Returns a
-    confirmation status on success.
+    each row to either SpeedTestResult or SpeedTestFailure. Triggers
+    aggregation of records older than 7 days as a background task after
+    ingestion completes.
     """
     ingest_speedtest()
+    background_tasks.add_task(aggregate_old_records, db)
     return {"status": "ingested"}
 
 @router.get(
@@ -109,3 +112,4 @@ def incidents(
     Useful for ISP complaint reporting.
     """
     return get_incidents(db, from_dt, to_dt)
+

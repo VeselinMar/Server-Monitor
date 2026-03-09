@@ -1,35 +1,50 @@
-.idea
-.ipynb_checkpoints
-.mypy_cache
-.vscode
-__pycache__
-.pytest_cache
-htmlcov
-dist
-site
-.coverage*
-coverage.xml
-.netlify
-test.db
-log.txt
-Pipfile.lock
-env3.*
-env
-docs_build
-site_build
-venv
-.venv
-docs.zip
-archive.zip
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
 
-monitoring.db
+# Environment
+.env
+.env.*
 
-# vim temporary files
-*~
-.*.sw?
-.cache
+# Database
+*.db
+*.db-shm
+*.db-wal
 
-# macOS
+# Alembic
+alembic/versions/*.pyc
+
+# Logs & monitoring data
+*.csv
+/mnt/media/monitoring/data/
+
+# Node / React
+node_modules/
+dist/
+frontend/dist/
+.npm/
+
+# Vite
+*.local
+frontend/.env
+frontend/.env.*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
 .DS_Store
+Thumbs.db
 
-.codspeed
+# Docker
+*.env
+docker-compose.override.yml

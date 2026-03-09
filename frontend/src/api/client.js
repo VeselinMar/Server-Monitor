@@ -10,6 +10,8 @@ export const speedtest = {
   count: () => api.get("/network/speedtest/count").then((r) => r.data),
   latest: () => api.get("/network/speedtest/latest").then((r) => r.data),
   ingest: () => api.post("/network/speedtest/ingest").then((r) => r.data),
+  incidents: (from_dt, to_dt) =>
+    api.get("/network/speedtest/incidents", { params: { from_dt, to_dt } }).then((r) => r.data),
 };
 
 export const connectivity = {
@@ -18,4 +20,10 @@ export const connectivity = {
   count: () => api.get("/network/connectivity/count").then((r) => r.data),
   latest: () => api.get("/network/connectivity/latest").then((r) => r.data),
   ingest: () => api.post("/network/connectivity/ingest").then((r) => r.data),
+};
+
+export const summary = {
+  history: (from_date, to_date) =>
+    api.get("/network/summary/history", { params: { from_date, to_date } }).then((r) => r.data),
+  latest: () => api.get("/network/summary/latest").then((r) => r.data),
 };

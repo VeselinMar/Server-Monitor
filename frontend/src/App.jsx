@@ -6,50 +6,64 @@ import TimeRangeSelector from "./components/TimeRangeSelector";
 import SpeedChart from "./components/SpeedChart";
 import PingChart from "./components/PingChart";
 import UptimeChart from "./components/UptimeChart";
-import OutageTable from "./components/OutageTable";
+import IncidentTable from "./components/IncidentTable";
+import SummarySection from "./components/SummarySection";
 
-const DEFAULT_PRESET = 24 * 7;
+const DEFAULT_PRESET = 24;
 
 export default function App() {
   const [preset, setPreset] = useState(DEFAULT_PRESET);
-  const [from, setFrom] = useState(() => presetRange(DEFAULT_PRESET).from);
-  const [to, setTo] = useState(() => presetRange(DEFAULT_PRESET).to);
+  // For presets, only store hours and recompute "to" as now at fetch time.
+  // For custom ranges, store explicit from/to dates.
+  const [customFrom, setCustomFrom] = useState(null);
+  const [customTo, setCustomTo] = useState(null);
 
   const [speedHistory, setSpeedHistory] = useState({ results: [], failures: [] });
   const [connHistory, setConnHistory] = useState([]);
   const [speedCounts, setSpeedCounts] = useState({ successful: 0, failed: 0, total: 0 });
   const [connCounts, setConnCounts] = useState({ online: 0, offline: 0, total: 0 });
   const [latest, setLatest] = useState(null);
+  const [incidents, setIncidents] = useState([]);
 
   const [loading, setLoading] = useState(false);
   const [ingesting, setIngesting] = useState(false);
   const [lastIngested, setLastIngested] = useState(null);
   const [error, setError] = useState(null);
 
+  // Derive effective range at render time so presets always use "now"
+  const effectiveRange = customFrom && customTo
+    ? { from: customFrom, to: customTo }
+    : presetRange(preset || DEFAULT_PRESET);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const fromISO = toISO(from);
-      const toISO_ = toISO(to);
-      const [sh, ch, sc, cc, lat] = await Promise.all([
+      const range = customFrom && customTo
+        ? { from: customFrom, to: customTo }
+        : presetRange(preset || DEFAULT_PRESET);
+      const fromISO = toISO(range.from);
+      const toISO_ = toISO(range.to);
+      const [sh, ch, sc, cc, lat, inc] = await Promise.all([
         speedtest.history(fromISO, toISO_),
         connectivity.history(fromISO, toISO_),
         speedtest.count(),
         connectivity.count(),
         speedtest.latest(),
+        speedtest.incidents(fromISO, toISO_),
       ]);
       setSpeedHistory(sh);
       setConnHistory(ch);
       setSpeedCounts(sc);
       setConnCounts(cc);
       setLatest(lat);
+      setIncidents(inc);
     } catch (e) {
       setError("Failed to fetch data. Is the backend running?");
     } finally {
       setLoading(false);
     }
-  }, [from, to]);
+  }, [preset, customFrom, customTo]);
 
   useEffect(() => {
     fetchData();
@@ -57,19 +71,18 @@ export default function App() {
 
   function handlePreset(hours) {
     setPreset(hours);
-    const { from: f, to: t } = presetRange(hours);
-    setFrom(f);
-    setTo(t);
+    setCustomFrom(null);
+    setCustomTo(null);
   }
 
   function handleFrom(date) {
     setPreset(null);
-    setFrom(date);
+    setCustomFrom(date);
   }
 
   function handleTo(date) {
     setPreset(null);
-    setTo(date);
+    setCustomTo(date);
   }
 
   async function handleIngest() {
@@ -156,8 +169,8 @@ export default function App() {
 
         <TimeRangeSelector
           preset={preset}
-          from={from}
-          to={to}
+          from={effectiveRange.from}
+          to={effectiveRange.to}
           onPreset={handlePreset}
           onFrom={handleFrom}
           onTo={handleTo}
@@ -172,22 +185,19 @@ export default function App() {
               speedResults={speedHistory.results}
               connectivityChecks={connHistory}
             />
-            <div className="two-col">
-              <UptimeChart
-                speedCounts={{
-                  successful: speedHistory.results.length,
-                  failed: speedHistory.failures.length,
-                }}
-                connCounts={{
-                  online: connHistory.filter((c) => c.status === "ONLINE").length,
-                  offline: connHistory.filter((c) => c.status === "NO INTERNET").length,
-                }}
-              />
-              <OutageTable
-                speedFailures={speedHistory.failures}
-                connectivityChecks={connHistory}
-              />
-            </div>
+            <UptimeChart
+              speedCounts={{
+                successful: speedHistory.results.length,
+                failed: speedHistory.failures.length,
+              }}
+              connCounts={{
+                online: connHistory.filter((c) => c.status === "ONLINE").length,
+                offline: connHistory.filter((c) => c.status === "NO INTERNET").length,
+              }}
+            />
+            <IncidentTable incidents={incidents} />
+            <div className="summary-divider" />
+            <SummarySection />
           </>
         )}
       </main>
