@@ -20,7 +20,7 @@ def _sanitise(data: dict) -> dict:
     }
 
 
-def ingest_connectivity():
+def ingest_connectivity(db: Session | None = None) -> None:
     """
     Read the connectivity check CSV log and insert only records newer than
     the latest stored timestamp.
@@ -28,6 +28,11 @@ def ingest_connectivity():
     All rows are inserted into a single table regardless of status, since
     failed checks (NO INTERNET) have no missing metrics — just a null latency.
     Deduplication is handled by comparing against the latest stored timestamp.
+
+    Args:
+        db: Optional database session. If not provided, a new session is
+            created and closed automatically. Pass an existing session in
+            tests to avoid patching SessionLocal.
 
     CSV format (headerless, 3 columns):
         timestamp, status, latency_ms
@@ -38,7 +43,7 @@ def ingest_connectivity():
     """
     df = pd.read_csv(
         LOG_PATH,
-        header=0,
+        header=None,
         names=COLUMNS,
         parse_dates=["timestamp"],
         on_bad_lines="skip",
@@ -47,7 +52,9 @@ def ingest_connectivity():
 
     df["latency_ms"] = pd.to_numeric(df["latency_ms"], errors="coerce")
 
-    db: Session = SessionLocal()
+    _owns_db = db is None
+    if _owns_db:
+        db = SessionLocal()
 
     try:
         latest_timestamp = get_latest_timestamp(db)
@@ -67,4 +74,5 @@ def ingest_connectivity():
         db.rollback()
         raise
     finally:
-        db.close()
+        if _owns_db:
+            db.close()

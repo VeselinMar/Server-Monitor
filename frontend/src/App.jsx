@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { speedtest, connectivity } from "./api/client";
+import SettingsModal from "./components/SettingsModal";
 import { presetRange, toISO } from "./utils/dates";
 import StatCard from "./components/StatCard";
 import TimeRangeSelector from "./components/TimeRangeSelector";
@@ -29,6 +30,7 @@ export default function App() {
   const [ingesting, setIngesting] = useState(false);
   const [lastIngested, setLastIngested] = useState(null);
   const [error, setError] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Derive effective range at render time so presets always use "now"
   const effectiveRange = customFrom && customTo
@@ -115,8 +117,19 @@ export default function App() {
           >
             {ingesting ? "Ingesting…" : "Ingest Logs"}
           </button>
+          <button
+            className="gear-btn"
+            onClick={() => setShowSettings(true)}
+            title="Settings"
+          >
+            ⚙
+          </button>
         </div>
       </header>
+
+      {showSettings && (
+        <SettingsModal onClose={() => setShowSettings(false)} />
+      )}
 
       {error && <div className="error-banner">{error}</div>}
 

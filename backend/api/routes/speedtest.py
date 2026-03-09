@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Optional
 from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -30,7 +30,7 @@ def get_db():
     "/latest",
     summary="Get the latest speed test record regardless of outcome",
     response_description="The most recent speed test record across both results and failures",
-    response_model=Union[SpeedTestResultResponse, SpeedTestFailureResponse],
+    response_model=Optional[Union[SpeedTestResultResponse, SpeedTestFailureResponse]],
 )
 def latest(db: Session = Depends(get_db)):
     """
@@ -74,6 +74,23 @@ def ingest(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     ingest_speedtest()
     background_tasks.add_task(aggregate_old_records, db)
     return {"status": "ingested"}
+
+@router.post(
+    "/reclassify",
+    summary="Re-classify all stored speedtest results using current thresholds",
+    response_description="Number of records whose classification changed",
+)
+def reclassify(db: Session = Depends(get_db)):
+    """
+    Re-run performance classification over all stored SpeedTestResult rows
+    using the threshold settings currently saved in the database.
+
+    Call this after updating thresholds in the settings UI to ensure existing
+    records reflect the new classification. Returns the count of rows updated.
+    """
+    updated = reclassify_all(db)
+    return {"updated": updated}
+
 
 @router.get(
     "/history",

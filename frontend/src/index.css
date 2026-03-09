@@ -498,3 +498,209 @@ body {
   color: var(--text);
   letter-spacing: -0.02em;
 }
+
+/* ── Export button ── */
+.summary-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.export-btn {
+  background: var(--blue);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity 0.15s, transform 0.1s;
+  display: inline-block;
+}
+
+.export-btn:hover  { opacity: 0.85; }
+.export-btn:active { transform: scale(0.98); }
+
+/* ── Gear button ── */
+.gear-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  width: 34px;
+  height: 34px;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s, border-color 0.12s;
+  color: var(--text-2);
+}
+.gear-btn:hover { background: var(--border); color: var(--text); }
+
+/* ── Modal ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+  width: 100%;
+  max-width: 560px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.modal-title {
+  font-family: 'Libre Baskerville', serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: var(--text-3);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.12s;
+}
+.modal-close:hover { background: var(--surface-2); color: var(--text); }
+
+.modal-body {
+  overflow-y: auto;
+  padding: 20px 24px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* ── Settings sections ── */
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-section-header { display: flex; flex-direction: column; gap: 2px; }
+
+.settings-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  font-family: 'Libre Baskerville', serif;
+}
+
+.settings-section-sub {
+  font-size: 11px;
+  color: var(--text-3);
+  font-family: 'DM Mono', monospace;
+}
+
+.settings-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-field {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-label {
+  font-size: 12px;
+  color: var(--text-2);
+  font-family: 'DM Sans', sans-serif;
+}
+
+.settings-hint {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.settings-input {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: 'DM Mono', monospace;
+  color: var(--text);
+  background: var(--surface-2);
+  outline: none;
+  width: 100%;
+  transition: border-color 0.12s;
+}
+.settings-input:focus { border-color: var(--blue); }
+
+.derive-btn {
+  align-self: flex-start;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--blue);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.derive-btn:hover { background: var(--border); }
+
+.settings-saved {
+  font-size: 12px;
+  color: var(--green);
+  font-family: 'DM Mono', monospace;
+  margin-right: auto;
+}
+
+.settings-error {
+  font-size: 12px;
+  color: var(--red);
+  font-family: 'DM Mono', monospace;
+}
+
+@media (max-width: 600px) {
+  .settings-field { grid-template-columns: 1fr; }
+}

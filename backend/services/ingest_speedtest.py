@@ -1,128 +1,185 @@
-import math
+"""
+Speedtest CSV ingest service.
+
+Reads the speedtest log CSV, deduplicates against the latest stored timestamp,
+and routes each row to SpeedTestResult or SpeedTestFailure. Performance
+classification thresholds are read from the settings table so they can be
+updated via the UI without restarting the server.
+"""
+
 import pandas as pd
 from sqlalchemy.orm import Session
 
 from core.database import SessionLocal
 from models.speedtest import SpeedTestResult, SpeedTestFailure
-from services.speedtest_service import get_latest_timestamp
-from pathlib import Path
+from repositories import settings_repository as settings_repo
 
-LOG_PATH = Path("/mnt/media/monitoring/data/speedtest.csv")
+LOG_PATH = "/mnt/media/monitoring/data/speedtest.csv"
 
-DOWNLOAD_DEGRADED = 75.0   # Drei guaranteed minimum (50% of 150 Mbps)
-DOWNLOAD_CRITICAL = 30.0
-UPLOAD_DEGRADED = 5.0
-UPLOAD_CRITICAL = 2.0
 
-COLUMNS = [
-    "timestamp",
-    "status",
-    "ping",
-    "download_mbps",
-    "upload_mbps",
-    "server_name",
-    "server_id",
-    "distance",
-    "failure_reason",
-]
-
-NUMERIC_COLS = ["ping", "download_mbps", "upload_mbps", "server_id", "distance"]
-
-def classify_speed(download_mbps: float, upload_mbps: float) -> str:
+def _get_thresholds(db: Session) -> dict:
     """
-    Classify a speed test result based on Drei MyLife FIX Data 150 thresholds.
+    Read performance classification thresholds from the settings table.
 
-    Returns 'CRITICAL' if either metric is severely below contracted levels,
-    'DEGRADED' if below the guaranteed minimum, or 'NORMAL' otherwise.
+    Falls back to defaults (Drei MyLife FIX Data 150) if not configured.
     """
-    if download_mbps < DOWNLOAD_CRITICAL or upload_mbps < UPLOAD_CRITICAL:
+    settings = settings_repo.get_all(db)
+    return {
+        "download_degraded": float(settings["download_degraded_mbps"]),
+        "download_critical": float(settings["download_critical_mbps"]),
+        "upload_degraded":   float(settings["upload_degraded_mbps"]),
+        "upload_critical":   float(settings["upload_critical_mbps"]),
+    }
+
+
+def classify_speed(download_mbps: float, upload_mbps: float, thresholds: dict) -> str:
+    """
+    Classify a speed test result based on configured thresholds.
+
+    Returns:
+        'CRITICAL'  — either metric is severely below contracted levels
+        'DEGRADED'  — either metric is below the guaranteed minimum
+        'NORMAL'    — both metrics are above the guaranteed minimum
+    """
+    if download_mbps < thresholds["download_critical"] or upload_mbps < thresholds["upload_critical"]:
         return "CRITICAL"
-    elif download_mbps < DOWNLOAD_DEGRADED or upload_mbps < UPLOAD_DEGRADED:
+    elif download_mbps < thresholds["download_degraded"] or upload_mbps < thresholds["upload_degraded"]:
         return "DEGRADED"
     return "NORMAL"
 
+
 def _columns_for(model) -> set:
-    """Return the set of column names defined on a SQLAlchemy model."""
-    return set(model.__table__.columns.keys())
+    """Return the set of column names for a SQLAlchemy model."""
+    return {c.key for c in model.__table__.columns}
 
 
-def _sanitise(data: dict) -> dict:
-    """Replace float NaN values with None for SQLAlchemy compatibility."""
-    return {
-        k: (None if isinstance(v, float) and math.isnan(v) else v)
-        for k, v in data.items()
-    }
+def _sanitise(val):
+    """Convert NaN float values to None for SQLAlchemy compatibility."""
+    import math
+    if isinstance(val, float) and math.isnan(val):
+        return None
+    return val
 
-def ingest_speedtest():
+
+def ingest_speedtest(db: Session | None = None) -> None:
     """
-    Read the speed test CSV log and insert only records newer than the latest
-    stored timestamp.
+    Parse the speedtest CSV log and persist new records to the database.
 
-    Successful runs (status == 'ONLINE', all core metrics present) are written
-    to SpeedTestResult. All other rows are written to SpeedTestFailure,
-    preserving the full test history for accurate uptime and reliability analysis.
+    Reads from LOG_PATH, coerces numeric columns, deduplicates against
+    the latest stored timestamp, and routes each row to either
+    SpeedTestResult (status ONLINE, all metrics present) or
+    SpeedTestFailure (failed or incomplete).
 
-    Skips any rows whose timestamp is less than or equal to the most recent
-    timestamp already present in the database, preventing duplicate entries
-    on repeated ingest calls.
+    Performance status is classified using thresholds from the settings
+    table at the time of ingest.
 
-    CSV format (headerless, 8 columns on success, 9 on failure):
-        timestamp, status, ping, download_mbps, upload_mbps,
-        server_name, server_id, distance[, failure_reason]
-
-    Failure reasons:
-        - Taken directly from the CSV's 9th column when present.
-        - 'missing_metrics' if status is ONLINE but core metrics could not be parsed.
-
-    Raises:
-        FileNotFoundError: If LOG_PATH does not exist.
-        sqlalchemy.exc.SQLAlchemyError: If the database commit fails.
+    Args:
+        db: Optional database session. If not provided, a new session is
+            created and closed automatically. Pass an existing session in
+            tests to avoid patching SessionLocal.
     """
-    df = pd.read_csv(
-        LOG_PATH,
-        header=None,
-        names=COLUMNS,
-        parse_dates=["timestamp"],
-        on_bad_lines="skip",
-        engine="python",
-    )
-
-    for col in NUMERIC_COLS:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-
-    db: Session = SessionLocal()
-
+    _owns_db = db is None
+    if _owns_db:
+        db = SessionLocal()
     try:
-        latest_timestamp = get_latest_timestamp(db)
+        thresholds = _get_thresholds(db)
+
+        df = pd.read_csv(
+            LOG_PATH,
+            header=None,
+            names=[
+                "timestamp", "status", "ping", "download_mbps",
+                "upload_mbps", "server_name", "server_id", "distance",
+                "failure_reason",
+            ],
+        )
+
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        for col in ["ping", "download_mbps", "upload_mbps", "distance"]:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+        # Deduplicate — only ingest records newer than the latest stored timestamp
+        latest_result = (
+            db.query(SpeedTestResult.timestamp)
+            .order_by(SpeedTestResult.timestamp.desc())
+            .limit(1)
+            .scalar()
+        )
+        latest_failure = (
+            db.query(SpeedTestFailure.timestamp)
+            .order_by(SpeedTestFailure.timestamp.desc())
+            .limit(1)
+            .scalar()
+        )
+        latest_timestamps = [t for t in [latest_result, latest_failure] if t is not None]
+        latest_timestamp = max(latest_timestamps) if latest_timestamps else None
 
         if latest_timestamp is not None:
-            df = df[df["timestamp"] > pd.Timestamp(latest_timestamp)]
+            df = df[df["timestamp"] > latest_timestamp]
 
         if df.empty:
             return
 
         for _, row in df.iterrows():
-            data = _sanitise(row.to_dict())
+            is_success = (
+                row["status"] == "ONLINE"
+                and pd.notna(row["download_mbps"])
+                and pd.notna(row["upload_mbps"])
+                and pd.notna(row["ping"])
+            )
 
-            if row["status"] != "ONLINE":
-                failure_reason = data.get("failure_reason") or f"status:{row['status']}"
-                db.add(SpeedTestFailure(
-                    **{k: v for k, v in data.items() if k in _columns_for(SpeedTestFailure) and k != "failure_reason"},
-                    failure_reason=failure_reason,
-                ))
-            elif pd.isna(row[["ping", "download_mbps", "upload_mbps"]]).any():
-                db.add(SpeedTestFailure(
-                    **{k: v for k, v in data.items() if k in _columns_for(SpeedTestFailure) and k != "failure_reason"},
-                    failure_reason="missing_metrics",
+            data = {
+                k: _sanitise(v)
+                for k, v in row.items()
+                if k != "failure_reason"
+            }
+
+            if is_success:
+                db.add(SpeedTestResult(
+                    **{k: v for k, v in data.items() if k in _columns_for(SpeedTestResult)},
+                    performance_status=classify_speed(
+                        row["download_mbps"],
+                        row["upload_mbps"],
+                        thresholds,
+                    ),
                 ))
             else:
-                db.add(SpeedTestResult(
-                **{k: v for k, v in data.items() if k in _columns_for(SpeedTestResult)},
-                performance_status=classify_speed(row["download_mbps"], row["upload_mbps"]),
-            ))
+                db.add(SpeedTestFailure(
+                    **{k: v for k, v in data.items() if k in _columns_for(SpeedTestFailure)},
+                    failure_reason=_sanitise(row.get("failure_reason")),
+                ))
+
         db.commit()
+
     except Exception:
         db.rollback()
         raise
     finally:
-        db.close()  
+        if _owns_db:
+            db.close()
+
+
+def reclassify_all(db: Session) -> int:
+    """
+    Re-run performance classification over all stored SpeedTestResult rows
+    using the current threshold settings.
+
+    Useful after changing thresholds in the settings UI — existing rows
+    retain their old classification until this is called.
+
+    Returns the number of rows updated.
+    """
+    thresholds = _get_thresholds(db)
+    results = db.query(SpeedTestResult).all()
+    count = 0
+    for result in results:
+        new_status = classify_speed(
+            result.download_mbps,
+            result.upload_mbps,
+            thresholds,
+        )
+        if result.performance_status != new_status:
+            result.performance_status = new_status
+            count += 1
+    db.commit()
+    return count

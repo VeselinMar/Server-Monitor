@@ -27,3 +27,8 @@ export const summary = {
     api.get("/network/summary/history", { params: { from_date, to_date } }).then((r) => r.data),
   latest: () => api.get("/network/summary/latest").then((r) => r.data),
 };
+
+export const settings = {
+  get:  ()     => api.get("/network/settings").then((r) => r.data),
+  save: (data) => api.put("/network/settings", data).then((r) => r.data),
+};

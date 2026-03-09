@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Optional
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -29,7 +29,7 @@ def get_db():
     "/latest",
     summary="Get the latest connectivity check record",
     response_description="The most recent connectivity check record",
-    response_model=ConnectivityCheckResponse,
+    response_model=Optional[ConnectivityCheckResponse]
 )
 def latest(db: Session = Depends(get_db)):
     """

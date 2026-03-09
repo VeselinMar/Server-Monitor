@@ -9,6 +9,8 @@ from core.database import Base
 from models.speedtest import SpeedTestResult, SpeedTestFailure
 from models.connectivity import ConnectivityCheck
 from models.daily_summary import DailySummary
+from models.settings import Setting
+
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
