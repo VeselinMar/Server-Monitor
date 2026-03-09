@@ -52,12 +52,15 @@ Once saved, all subsequent ingests will classify results against your configured
 
 ### Speedtest Monitor
 
-**Location:** `/usr/local/bin/speedtest_monitor.sh`
+**Script:** `scripts/speedtest_monitor.sh`
+**Install:** `/usr/local/bin/speedtest_monitor.sh`
 **Schedule:** Hourly — `0 * * * *`
 **Adaptive schedule:** Every 10 minutes when degraded flag exists — `*/10 * * * * [ -f /tmp/speedtest_degraded ] && /usr/local/bin/speedtest_monitor.sh`
 **Log:** `/mnt/media/monitoring/data/speedtest.csv`
 
-Runs a speed test and appends the result to the CSV log. Attempts up to 3 times with a 10-second delay between retries, timing out after 180 seconds per attempt. Sets the degraded flag when download falls below 75 Mbps to trigger more frequent testing — providing denser data during outages for more accurate incident duration calculation.
+Runs a speed test and appends the result to the CSV log. Attempts up to 3 times with a 10-second delay between retries, timing out after 180 seconds per attempt. Creates the log file on first run if it does not exist. After each successful test, sets or clears `/tmp/speedtest_degraded` depending on whether download falls below 75 Mbps — this flag triggers more frequent adaptive testing, providing denser data during poor performance periods for more accurate incident duration calculation.
+
+> **Note:** The degraded flag threshold (75 Mbps) is hardcoded in the script and is independent of the degraded threshold configured in the settings UI. If you change `download_degraded_mbps` in the app, update the script manually to match.
 
 **Successful row:**
 ```
@@ -75,11 +78,12 @@ Column order: `timestamp, status, ping, download_mbps, upload_mbps, server_name,
 
 ### Connectivity Monitor
 
-**Location:** `/usr/local/bin/connectivity_check.sh`
+**Script:** `scripts/connectivity_check.sh`
+**Install:** `/usr/local/bin/connectivity_check.sh`
 **Schedule:** Every 20 minutes — `*/20 * * * *`
 **Log:** `/mnt/media/monitoring/data/connectivity.csv`
 
-Pings `8.8.8.8` twice and records whether the connection is up, along with average round-trip latency.
+Pings `8.8.8.8` twice with a 2-second timeout and records whether the connection is up, along with average round-trip latency. Creates the log file on first run if it does not exist.
 
 **Online row:**
 ```
@@ -95,7 +99,24 @@ Column order: `timestamp, status, latency_ms`
 
 ---
 
+### Log Rotation
+
+Logs are rotated monthly via logrotate, keeping 24 months of history. Rotated files are gzip-compressed and named `speedtest.csv.1.gz`, `connectivity.csv.1.gz` etc. The ingest service only reads the active CSV — compressed archives are not ingested automatically. Since raw records older than 7 days are aggregated and deleted, any data in a rotated archive that fell within the last 7 days of the previous month will not be captured. This is a known limitation.
+
+---
+
 ### Cron Setup
+
+Install the scripts from the repository:
+
+```bash
+sudo cp scripts/speedtest_monitor.sh /usr/local/bin/speedtest_monitor.sh
+sudo cp scripts/connectivity_check.sh /usr/local/bin/connectivity_check.sh
+sudo chmod +x /usr/local/bin/speedtest_monitor.sh
+sudo chmod +x /usr/local/bin/connectivity_check.sh
+```
+
+Then add the cron entries:
 
 ```bash
 sudo crontab -e
