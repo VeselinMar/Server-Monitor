@@ -1,8 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? "/servermonitor"
-,
+  baseURL: import.meta.env.VITE_API_URL ?? "/servermonitor",
 });
 
 export const speedtest = {
@@ -32,4 +31,8 @@ export const summary = {
 export const settings = {
   get:  ()     => api.get("/network/settings").then((r) => r.data),
   save: (data) => api.put("/network/settings", data).then((r) => r.data),
+};
+
+export const status = {
+  get: () => api.get("/network/status").then((r) => r.data),
 };

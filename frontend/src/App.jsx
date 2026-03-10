@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { speedtest, connectivity } from "./api/client";
+import { speedtest, connectivity, status } from "./api/client";
 import SettingsModal from "./components/SettingsModal";
 import { presetRange, toISO } from "./utils/dates";
 import StatCard from "./components/StatCard";
@@ -11,12 +11,12 @@ import IncidentTable from "./components/IncidentTable";
 import SummarySection from "./components/SummarySection";
 
 const DEFAULT_PRESET = 24;
-const sortByTime = (arr) => [...arr].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+const INGEST_THRESHOLD_MINUTES = 20;
+
+const sortByTime = (arr) => [...arr].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
 export default function App() {
   const [preset, setPreset] = useState(DEFAULT_PRESET);
-  // For presets, only store hours and recompute "to" as now at fetch time.
-  // For custom ranges, store explicit from/to dates.
   const [customFrom, setCustomFrom] = useState(null);
   const [customTo, setCustomTo] = useState(null);
 
@@ -28,8 +28,6 @@ export default function App() {
   const [incidents, setIncidents] = useState([]);
 
   const [loading, setLoading] = useState(false);
-  const [ingesting, setIngesting] = useState(false);
-  const [lastIngested, setLastIngested] = useState(null);
   const [error, setError] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
 
@@ -68,6 +66,27 @@ export default function App() {
     }
   }, [preset, customFrom, customTo]);
 
+  // On mount: check last ingest timestamp, trigger ingest if stale, then fetch
+  useEffect(() => {
+    async function initData() {
+      try {
+        const { last_ingest } = await status.get();
+        const isStale = !last_ingest ||
+          (Date.now() - new Date(last_ingest).getTime()) > INGEST_THRESHOLD_MINUTES * 60 * 1000;
+
+        if (isStale) {
+          await Promise.all([speedtest.ingest(), connectivity.ingest()]);
+        }
+      } catch {
+        // Ingest failure is non-fatal — proceed to fetch whatever is in the DB
+      }
+      await fetchData();
+    }
+    initData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-fetch when time range changes (but skip the ingest check)
   useEffect(() => {
     fetchData();
   }, [fetchData]);
@@ -88,19 +107,6 @@ export default function App() {
     setCustomTo(date);
   }
 
-  async function handleIngest() {
-    setIngesting(true);
-    try {
-      await Promise.all([speedtest.ingest(), connectivity.ingest()]);
-      setLastIngested(new Date().toLocaleTimeString());
-      await fetchData();
-    } catch (e) {
-      setError("Ingest failed. Check the backend logs.");
-    } finally {
-      setIngesting(false);
-    }
-  }
-
   return (
     <div className="app">
       <header className="header">
@@ -110,14 +116,6 @@ export default function App() {
           <span className="header-sub">Network Health Dashboard</span>
         </div>
         <div className="header-right">
-          {lastIngested && <span className="last-ingested">Last ingested {lastIngested}</span>}
-          <button
-            className={`ingest-btn ${ingesting ? "loading" : ""}`}
-            onClick={handleIngest}
-            disabled={ingesting}
-          >
-            {ingesting ? "Ingesting…" : "Ingest Logs"}
-          </button>
           <button
             className="gear-btn"
             onClick={() => setShowSettings(true)}
