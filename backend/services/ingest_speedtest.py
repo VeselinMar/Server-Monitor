@@ -87,7 +87,7 @@ def ingest_speedtest(db: Session | None = None) -> None:
         thresholds = _get_thresholds(db)
 
         df = pd.read_csv(
-            LOG_PATH,
+            LOG_PATH_SPEEDTEST,
             header=None,
             names=[
                 "timestamp", "status", "ping", "download_mbps",

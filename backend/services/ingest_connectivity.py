@@ -42,7 +42,7 @@ def ingest_connectivity(db: Session | None = None) -> None:
         sqlalchemy.exc.SQLAlchemyError: If the database commit fails.
     """
     df = pd.read_csv(
-        LOG_PATH,
+        LOG_PATH_CONNECTIVITY,
         header=None,
         names=COLUMNS,
         parse_dates=["timestamp"],
