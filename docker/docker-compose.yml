@@ -8,6 +8,8 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: sqlite:////data/monitoring.db
+      LOG_PATH_SPEEDTEST: /data/speedtest.csv
+      LOG_PATH_CONNECTIVITY: /data/connectivity.csv
     volumes:
       - /mnt/media/monitoring/data:/data
     networks:

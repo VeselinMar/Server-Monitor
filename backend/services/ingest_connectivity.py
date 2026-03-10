@@ -1,3 +1,4 @@
+import os
 import math
 import pandas as pd
 from sqlalchemy.orm import Session
@@ -7,8 +8,7 @@ from models.connectivity import ConnectivityCheck
 from services.connectivity_service import get_latest_timestamp
 from pathlib import Path
 
-LOG_PATH = Path("/mnt/media/monitoring/data/connectivity.csv")
-
+Path(os.getenv("LOG_PATH_CONNECTIVITY", "/mnt/media/monitoring/data/connectivity.csv"))
 COLUMNS = ["timestamp", "status", "latency_ms"]
 
 

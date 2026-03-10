@@ -7,6 +7,7 @@ classification thresholds are read from the settings table so they can be
 updated via the UI without restarting the server.
 """
 
+import os
 import pandas as pd
 from sqlalchemy.orm import Session
 
@@ -14,7 +15,7 @@ from core.database import SessionLocal
 from models.speedtest import SpeedTestResult, SpeedTestFailure
 from repositories import settings_repository as settings_repo
 
-LOG_PATH = "/mnt/media/monitoring/data/speedtest.csv"
+Path(os.getenv("LOG_PATH_SPEEDTEST", "/mnt/media/monitoring/data/speedtest.csv"))
 
 
 def _get_thresholds(db: Session) -> dict:
