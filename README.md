@@ -1,6 +1,6 @@
 # ServerMonitor
 
-A full-stack network health monitor targeting the Drei Austria MyLife FIX Data 150 plan (guaranteed minimum 75 Mbps download). Bash scripts run scheduled connectivity and speed tests, appending results to CSV logs. A FastAPI backend ingests the logs, classifies performance against configurable thresholds, and exposes a REST API. A React frontend visualises the metrics and generates PDF reports suitable for ISP complaint submission.
+ServerMonitor is a self-hosted network health monitor built to document and report on ISP underperformance. It runs automated speed and connectivity tests, visualises the results over time, and generates formatted PDF reports for ISP complaint submission. Built for the Drei Austria MyLife FIX Data 150 plan (contracted minimum 75 Mbps download).
 
 ---
 
