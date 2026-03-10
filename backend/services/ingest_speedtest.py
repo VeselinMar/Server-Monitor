@@ -16,7 +16,7 @@ from core.database import SessionLocal
 from models.speedtest import SpeedTestResult, SpeedTestFailure
 from repositories import settings_repository as settings_repo
 
-Path(os.getenv("LOG_PATH_SPEEDTEST", "/mnt/media/monitoring/data/speedtest.csv"))
+LOG_PATH_SPEEDTEST = Path(os.getenv("LOG_PATH_SPEEDTEST", "/mnt/media/monitoring/data/speedtest.csv"))
 
 
 def _get_thresholds(db: Session) -> dict:

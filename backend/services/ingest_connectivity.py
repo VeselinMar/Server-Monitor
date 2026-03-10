@@ -8,7 +8,7 @@ from models.connectivity import ConnectivityCheck
 from services.connectivity_service import get_latest_timestamp
 from pathlib import Path
 
-Path(os.getenv("LOG_PATH_CONNECTIVITY", "/mnt/media/monitoring/data/connectivity.csv"))
+LOG_PATH_CONNECTIVITY = Path(os.getenv("LOG_PATH_CONNECTIVITY", "/mnt/media/monitoring/data/connectivity.csv"))
 COLUMNS = ["timestamp", "status", "latency_ms"]
 
 
