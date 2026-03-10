@@ -1,7 +1,8 @@
 from sqlalchemy import Column, Integer, Float, String, DateTime
+from typing import Optional
 from core.database import Base
 import sqlalchemy as sa
-
+from sqlalchemy.orm import Mapped, mapped_column
 
 class SpeedTestMixin:
     """
@@ -76,7 +77,7 @@ class SpeedTestFailure(SpeedTestMixin, Base):
 
     __tablename__ = "speedtest_failures"
 
-    failure_reason = Column(String, nullable=False)
+    failure_reason: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     """
     Short description of why the record was classified as a failure. Possible values:
