@@ -25,26 +25,35 @@ function CustomTooltip({ active, payload, label }) {
   );
 }
 
-export default function PingChart({ speedResults, connectivityChecks }) {
-  // Merge both series by timestamp into a unified timeline
-  const speedMap = Object.fromEntries(
-    speedResults.map((r) => [fmtTimestamp(r.timestamp), r.ping])
-  );
-  const connMap = Object.fromEntries(
-    connectivityChecks
-      .filter((c) => c.latency_ms != null)
-      .map((c) => [fmtTimestamp(c.timestamp), c.latency_ms])
-  );
+  export default function PingChart({ speedResults, connectivityChecks }) {
+    const merged = [
+      ...speedResults.map((r) => ({
+        time: fmtTimestamp(r.timestamp),
+        ts: new Date(r.timestamp),
+        speedPing: r.ping,
+        connLatency: null,
+      })),
+      ...connectivityChecks
+        .filter((c) => c.latency_ms != null)
+        .map((c) => ({
+          time: fmtTimestamp(c.timestamp),
+          ts: new Date(c.timestamp),
+          speedPing: null,
+          connLatency: c.latency_ms,
+        })),
+    ].sort((a, b) => a.ts - b.ts);
 
-  const allTimes = Array.from(
-    new Set([...Object.keys(speedMap), ...Object.keys(connMap)])
-  ).sort();
-
-  const data = allTimes.map((t) => ({
-    time: t,
-    speedPing: speedMap[t] ?? null,
-    connLatency: connMap[t] ?? null,
-  }));
+    // Merge entries with the same formatted timestamp
+    const seen = new Map();
+    for (const entry of merged) {
+      if (!seen.has(entry.time)) {
+        seen.set(entry.time, { time: entry.time, speedPing: null, connLatency: null });
+      }
+      const e = seen.get(entry.time);
+      if (entry.speedPing != null) e.speedPing = entry.speedPing;
+      if (entry.connLatency != null) e.connLatency = entry.connLatency;
+    }
+    const data = Array.from(seen.values());
 
   return (
     <div className="chart-card">
