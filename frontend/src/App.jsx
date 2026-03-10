@@ -11,6 +11,7 @@ import IncidentTable from "./components/IncidentTable";
 import SummarySection from "./components/SummarySection";
 
 const DEFAULT_PRESET = 24;
+const sortByTime = (arr) => [...arr].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
 
 export default function App() {
   const [preset, setPreset] = useState(DEFAULT_PRESET);
@@ -54,8 +55,8 @@ export default function App() {
         speedtest.latest(),
         speedtest.incidents(fromISO, toISO_),
       ]);
-      setSpeedHistory(sh);
-      setConnHistory(ch);
+      setSpeedHistory({ results: sortByTime(sh.results), failures: sortByTime(sh.failures) });
+      setConnHistory(sortByTime(ch));
       setSpeedCounts(sc);
       setConnCounts(cc);
       setLatest(lat);
