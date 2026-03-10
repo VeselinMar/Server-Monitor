@@ -1,6 +1,19 @@
 # ServerMonitor
 
-A full-stack network health monitor targeting the Drei Austria MyLife FIX Data 150 plan (guaranteed minimum 75 Mbps download). Bash scripts run scheduled connectivity and speed tests, appending results to CSV logs. A FastAPI backend ingests the logs, classifies performance against configurable thresholds, and exposes a REST API. A React frontend visualises the metrics and can generate PDF reports suitable for ISP complaint submission.
+A full-stack network health monitor targeting the Drei Austria MyLife FIX Data 150 plan (guaranteed minimum 75 Mbps download). Bash scripts run scheduled connectivity and speed tests, appending results to CSV logs. A FastAPI backend ingests the logs, classifies performance against configurable thresholds, and exposes a REST API. A React frontend visualises the metrics and generates PDF reports suitable for ISP complaint submission.
+
+---
+
+## Screenshots
+
+**Download & Upload Speed — performance zones and threshold lines**
+![Speed Chart](docs/screenshots/speed_chart.png)
+
+**Incident Table — grouped outage and degradation events with severity highlighting**
+![Incident Table](docs/screenshots/incident_table.png)
+
+**Settings Modal — subscriber details and service thresholds**
+![Settings Modal](docs/screenshots/settings_modal.png)
 
 ---
 
@@ -11,7 +24,9 @@ A full-stack network health monitor targeting the Drei Austria MyLife FIX Data 1
 [cron] → connectivity_check.sh → connectivity.csv  ┴→ FastAPI ingest → SQLite → REST API → React frontend
 ```
 
-The monitoring scripts run directly on the host. The backend runs in a container. Both share access to `/mnt/media/monitoring/data/` via a mounted volume — this is the only bridge between them.
+The monitoring scripts run directly on the host. The backend and frontend run in Docker containers. Both the scripts and the containers share access to `/mnt/media/monitoring/data/` via a volume mount — this is the only bridge between them.
+
+For full deployment instructions see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ---
 
@@ -22,13 +37,15 @@ The monitoring scripts run directly on the host. The backend runs in a container
 - `jq` for JSON parsing
 - `awk`, `bash` (standard on most Linux systems)
 
-**Backend container:**
-- Python 3.12+
-- pip dependencies via `requirements.txt`
-- `reportlab` for PDF generation
-- `pypdf` for PDF tests
+**Containers:**
+- Docker and Docker Compose
+- No other dependencies — everything else is installed inside the containers at build time
 
-**Frontend:**
+**Local development (backend):**
+- Python 3.12+
+- pip dependencies via `backend/requirements.txt`
+
+**Local development (frontend):**
 - Node.js 18+
 
 ---
@@ -44,7 +61,7 @@ Before running any ingests, configure your subscriber details and service thresh
 
 Once saved, all subsequent ingests will classify results against your configured thresholds. Existing rows can be reclassified at any time via `POST /network/speedtest/reclassify`.
 
-> **Note on the degraded flag in `speedtest_monitor.sh`:** The script uses a hardcoded threshold of `75` Mbps to set `/tmp/speedtest_degraded`, which triggers more frequent testing during poor performance. If you change the degraded threshold in the settings UI, update this value in the script manually — it is intentionally decoupled from the backend to keep the monitoring scripts self-contained and independent of the container being up.
+> **Note on the degraded flag in `speedtest_monitor.sh`:** The script uses a hardcoded threshold of `75` Mbps to set `/tmp/speedtest_degraded`, which triggers more frequent testing during poor performance. If you change the degraded threshold in the settings UI, update this value in the script manually — it is intentionally decoupled from the backend to keep the monitoring scripts self-contained and independent of the containers being up.
 
 ---
 
@@ -130,6 +147,36 @@ sudo crontab -e
 
 ---
 
+## Deployment
+
+The backend and frontend are containerised and run behind a shared nginx reverse proxy. The proxy is the only service bound to port 80 — all apps on the server share it. See [DEPLOYMENT.md](DEPLOYMENT.md) for full step-by-step instructions covering:
+
+- Setting up the shared Docker network and proxy
+- Building and starting the ServerMonitor containers
+- DNS configuration for local network access at `http://servermonitor/servermonitor`
+- Ongoing operations — rebuilding, log viewing, adding future apps
+
+### Container Structure
+
+```
+docker/
+├── docker-compose.yml      # Backend + frontend services, joins proxy-network
+├── backend.dockerfile      # Python 3.12-slim, installs deps, runs alembic + uvicorn
+└── frontend.dockerfile     # Node 18 build stage → nginx:alpine serve stage
+```
+
+The backend runs Alembic migrations automatically on every container start before uvicorn starts. The database and CSV logs are shared with the host via a volume mount at `/mnt/media/monitoring/data/`.
+
+**Environment variables (backend):**
+
+| Variable | Description | Default |
+|---|---|---|
+| `DATABASE_URL` | SQLAlchemy connection string | `sqlite:///./monitoring.db` |
+| `LOG_PATH_SPEEDTEST` | Path to speedtest CSV inside container | `/mnt/media/monitoring/data/speedtest.csv` |
+| `LOG_PATH_CONNECTIVITY` | Path to connectivity CSV inside container | `/mnt/media/monitoring/data/connectivity.csv` |
+
+---
+
 ## Backend
 
 ### Project Structure
@@ -137,6 +184,7 @@ sudo crontab -e
 ```
 backend/
 ├── main.py
+├── alembic/                         # Database migrations
 ├── api/
 │   ├── router.py
 │   └── routes/
@@ -145,15 +193,14 @@ backend/
 │       ├── summary.py
 │       ├── report.py
 │       └── settings.py
-├── alembic/
 ├── core/
 │   ├── config.py
 │   └── database.py
 ├── models/
-│   ├── speedtest.py
-│   ├── connectivity.py
-│   ├── daily_summary.py
-│   └── settings.py
+│   ├── speedtest.py                 # SpeedTestResult, SpeedTestFailure
+│   ├── connectivity.py              # ConnectivityCheck
+│   ├── daily_summary.py             # DailySummary
+│   └── settings.py                  # Setting (key-value store)
 ├── repositories/
 │   ├── speedtest_repository.py
 │   ├── connectivity_repository.py
@@ -179,7 +226,7 @@ backend/
     └── test_report.py
 ```
 
-### Setup
+### Local Development Setup
 
 ```bash
 cd backend
@@ -187,35 +234,22 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 alembic upgrade head
-```
-
-### Configuration
-
-Database URL via environment variable, defaults to local SQLite:
-
-```bash
-export DATABASE_URL=sqlite:///./monitoring.db
-```
-
-### Running
-
-```bash
 uvicorn main:app --reload
 ```
 
-API docs: `http://localhost:8000/docs`
+API docs available at `http://localhost:8000/docs`.
 
 ### Running Tests
 
 Tests use an in-memory SQLite database and a FastAPI test client. Each test gets a clean session that is rolled back after the test completes — no data bleeds between tests and no files are written to disk.
 
-`pytest.ini` is located in `backend/tests/` and configures the test runner automatically. From the `backend/` directory:
+`pytest.ini` is in `backend/` and configures the test runner automatically. From the `backend/` directory:
 
 ```bash
 pytest tests/
 ```
 
-No `PYTHONPATH` prefix needed — `pythonpath = .` in `pytest.ini` handles it. Use `--tb=line` for a compact summary:
+Use `--tb=line` for a compact summary:
 
 ```bash
 pytest tests/ --tb=line
@@ -284,11 +318,11 @@ frontend/
 
 **`App.jsx`** is the single stateful root. It owns the selected time range, fetches all six data endpoints in parallel on range change, and passes data down to display components. The time range is stored as a preset (hours) or explicit `from`/`to` pair; the effective range is computed fresh on each fetch so preset ranges always use the current time.
 
-**`client.js`** exports five typed objects (`speedtest`, `connectivity`, `summary`, `settings`, and the report URL helper) wrapping a shared axios instance pointed at `http://localhost:8000`.
+**`client.js`** exports five typed objects (`speedtest`, `connectivity`, `summary`, `settings`, and the report URL helper) wrapping a shared axios instance. In production requests are relative to the current origin and routed through the proxy. In local development `VITE_API_URL=http://localhost:8000` in `frontend/.env.local` overrides the base URL.
 
 **`SpeedChart`** renders a `ComposedChart` with coloured scatter dots per `performance_status` (green/amber/red), `ReferenceArea` background bands for the NORMAL/DEGRADED/CRITICAL zones, and threshold lines at the configured guarantee and critical values.
 
-**`UptimeChart`** shows two side-by-side donut charts — one for connectivity uptime (online vs offline checks) and one for speedtest outcome (successful vs failed). A vertical divider separates them.
+**`UptimeChart`** shows two side-by-side donut charts — one for connectivity uptime (online vs offline checks) and one for speedtest outcome (successful vs failed).
 
 **`IncidentTable`** displays grouped incidents returned by `/network/speedtest/incidents`, with row colours indicating severity: red for `NO INTERNET` and `CRITICAL`, amber for `DEGRADED` and `FAILURE`.
 
@@ -296,7 +330,7 @@ frontend/
 
 **`SettingsModal`** opens from the ⚙ gear button in the header. Two sections — Subscriber Details (used in the PDF report) and Service Thresholds (used for classification). An "Auto-derive from contracted speed" button computes degraded (50%) and critical (20%) thresholds automatically. Saving persists to the backend and closes the modal after a brief confirmation flash.
 
-### Running
+### Local Development
 
 ```bash
 cd frontend
@@ -304,7 +338,7 @@ npm install
 npm run dev
 ```
 
-App available at `http://localhost:5173`.
+App available at `http://localhost:5173`. Requires the backend to be running separately.
 
 ---
 
@@ -405,7 +439,7 @@ Raw records older than 7 days are automatically aggregated into daily summaries 
 |---|---|---|
 | timestamp | DateTime | Time of the attempt |
 | status | String | Always `FAILED` |
-| failure_reason | String | Error message from the CLI |
+| failure_reason | String | Error message from the CLI. Nullable |
 
 ### `connectivity_checks`
 
@@ -431,4 +465,6 @@ Key-value store for subscriber details and service thresholds. Defaults are appl
 - **Backend is the single source of truth** for thresholds, classification, and reporting.
 - **No silent discards** — every CSV row is persisted. Failures go to `speedtest_failures`, ensuring uptime metrics are not positively skewed.
 - **Deduplication** — ingest only inserts rows newer than the latest stored timestamp. Re-running ingest is always safe.
+- **Ingest is manual** — there are no cron jobs triggering ingest. The "Ingest Logs" button in the dashboard header is the trigger. This is intentional — the server prioritises resource efficiency and ingest should happen on demand.
 - **Layered backend** — routes → services → repositories. Query logic lives in the repository layer only.
+- **Alembic owns the schema** — `Base.metadata.create_all()` is not used. All schema changes go through versioned migrations in `backend/alembic/versions/`.
