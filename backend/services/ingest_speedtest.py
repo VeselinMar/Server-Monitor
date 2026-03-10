@@ -16,7 +16,7 @@ from core.database import SessionLocal
 from models.speedtest import SpeedTestResult, SpeedTestFailure
 from repositories import settings_repository as settings_repo
 
-LOG_PATH_SPEEDTEST = Path(os.getenv("LOG_PATH_SPEEDTEST", "/mnt/media/monitoring/data/speedtest.csv"))
+LOG_PATH = Path(os.getenv("LOG_PATH_SPEEDTEST", "/mnt/media/monitoring/data/speedtest.csv"))
 
 
 def _get_thresholds(db: Session) -> dict:
@@ -87,7 +87,7 @@ def ingest_speedtest(db: Session | None = None) -> None:
         thresholds = _get_thresholds(db)
 
         df = pd.read_csv(
-            LOG_PATH_SPEEDTEST,
+            LOG_PATH,
             header=None,
             names=[
                 "timestamp", "status", "ping", "download_mbps",

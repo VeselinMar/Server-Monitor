@@ -8,7 +8,7 @@ from models.connectivity import ConnectivityCheck
 from services.connectivity_service import get_latest_timestamp
 from pathlib import Path
 
-LOG_PATH_CONNECTIVITY = Path(os.getenv("LOG_PATH_CONNECTIVITY", "/mnt/media/monitoring/data/connectivity.csv"))
+LOG_PATH = Path(os.getenv("LOG_PATH_CONNECTIVITY", "/mnt/media/monitoring/data/connectivity.csv"))
 COLUMNS = ["timestamp", "status", "latency_ms"]
 
 
@@ -42,7 +42,7 @@ def ingest_connectivity(db: Session | None = None) -> None:
         sqlalchemy.exc.SQLAlchemyError: If the database commit fails.
     """
     df = pd.read_csv(
-        LOG_PATH_CONNECTIVITY,
+        LOG_PATH,
         header=None,
         names=COLUMNS,
         parse_dates=["timestamp"],

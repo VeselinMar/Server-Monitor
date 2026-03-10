@@ -1,13 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-from core.database import engine, Base
-
 from api.router import api_router
-
-# Create all tables defined on Base metadata if they don't already exist.
-# This runs on startup, so the database schema is always in sync with the models.
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Server Monitor",
@@ -21,6 +14,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(api_router)
 
 @app.get(
     "/",
