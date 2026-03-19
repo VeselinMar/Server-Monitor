@@ -40,5 +40,5 @@ class SpeedTestResultResponse(SpeedTestBase):
 class SpeedTestFailureResponse(SpeedTestBase):
     """Response schema for a failed speed test record."""
 
-    failure_reason: str
+    failure_reason: Optional[str]
     """Description of why the test was classified as a failure."""

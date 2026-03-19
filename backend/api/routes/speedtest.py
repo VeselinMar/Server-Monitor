@@ -30,7 +30,7 @@ def get_db():
     "/latest",
     summary="Get the latest speed test record regardless of outcome",
     response_description="The most recent speed test record across both results and failures",
-    response_model=Optional[Union[SpeedTestResultResponse, SpeedTestFailureResponse]],
+    response_model=Optional[Union[SpeedTestFailureResponse, SpeedTestResultResponse]],
 )
 def latest(db: Session = Depends(get_db)):
     """
