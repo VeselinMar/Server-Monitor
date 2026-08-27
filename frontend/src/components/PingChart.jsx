@@ -11,6 +11,52 @@ import {
 import { fmtTimestamp } from "../utils/dates";
 import { parseISO as parse, format } from "date-fns";
 
+const percentile = (values, p) => {
+  const sorted = values
+    .filter((value) => Number.isFinite(value))
+    .sort((a, b) => a - b);
+
+  if (!sorted.length) return null;
+
+  const index = (sorted.length - 1) * p;
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+
+  if (lower === upper) {
+    return sorted[lower];
+  }
+
+  return (
+    sorted[lower] +
+    (sorted[upper] - sorted[lower]) * (index - lower)
+  );
+};
+
+const getLatencyDomain = (data) => {
+  const values = data.flatMap((point) => [
+    point.speedPing,
+    point.connLatency,
+  ]);
+
+  const clean = values.filter((value) => Number.isFinite(value));
+
+  if (!clean.length) {
+    return [0, 100];
+  }
+
+  const p95 = percentile(clean, 0.95);
+
+  if (!p95 || p95 <= 0) {
+    return [0, 100];
+  }
+
+  return [0, Math.max(p95 * 1.2, 10)];
+};
+
+const data = Array.from(seen.values());
+const latencyDomain = getLatencyDomain(data);
+
+
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
@@ -67,7 +113,11 @@ function CustomTooltip({ active, payload, label }) {
             tick={{ fontSize: 11, fill: "#888" }}
             interval="preserveStartEnd"
           />
-          <YAxis tick={{ fontSize: 11, fill: "#888" }} unit=" ms" width={56} />
+          <YAxis
+            domain={latencyDomain}
+            tick={{ fontSize: 11, fill: "#888" }} 
+            unit=" ms" 
+            width={56} />
           <Tooltip content={<CustomTooltip />} />
           <Legend />
           <Line
