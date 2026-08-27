@@ -6,6 +6,7 @@ import {
   serverHealth,
 } from "./api/client";
 import ServerHealthCards from "./components/ServerHealthCards";
+import ServerHealthChart from "./components/ServerHealthChart";
 import SettingsModal from "./components/SettingsModal";
 import { presetRange, toISO } from "./utils/dates";
 import StatCard from "./components/StatCard";
@@ -33,6 +34,7 @@ export default function App() {
   const [latest, setLatest] = useState(null);
   const [serverHealthLatest, setServerHealthLatest] = useState(null);
   const [incidents, setIncidents] = useState([]);
+  const [serverHealthHistory, setServerHealthHistory] = useState([]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -62,9 +64,13 @@ export default function App() {
       ]);
 
       let health = null;
+      let healthHistory = [];
 
       try {
-        health = await serverHealth.latest();
+        [health, healthHistory] = await Promise.all([
+          serverHealth.latest(),
+          serverHealth.history(fromISO, toISO_),
+        ]);
       } catch {
         // Server health is optional; keep the network dashboard working.
       }
@@ -74,6 +80,7 @@ export default function App() {
       setConnCounts(cc);
       setLatest(lat);
       setServerHealthLatest(health);
+      setServerHealthHistory(healthHistory);
       setIncidents(inc);
     } catch (e) {
       setError("Failed to fetch data. Is the backend running?");
@@ -150,6 +157,7 @@ export default function App() {
 
       <main className="main">
         <ServerHealthCards health={serverHealthLatest} />
+        <ServerHealthChart history={serverHealthHistory} />
 
         <section className="stat-row">
           <StatCard
