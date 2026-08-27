@@ -15,15 +15,16 @@ export function toISO(date) {
   return date.toISOString();
 }
 
-function parseUTCTimestamp(ts) {
+export function parseUTCTimestamp(ts) {
   const normalized = ts.endsWith("Z") ? ts : `${ts}Z`;
-  return parseISO(normalized);
+  return new Date(normalized);
 }
 
 export function fmtTimestamp(ts) {
-  return format(parseUTCTimestamp(ts), "MMM d, HH:mm");
+  const normalized = ts.endsWith("Z") ? ts : `${ts}Z`;
+  return format(parseISO(normalized), "MMM d, HH:mm");
 }
 
 export function fmtDate(ts) {
-  return format(parseUTCTimestamp(ts), "MMM d");
+  return format(parseISO(ts), "MMM d");
 }
