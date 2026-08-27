@@ -10,6 +10,7 @@ services:
       DATABASE_URL: sqlite:////data/monitoring.db
       LOG_PATH_SPEEDTEST: /data/speedtest.csv
       LOG_PATH_CONNECTIVITY: /data/connectivity.csv
+      SERVER_HEALTH_API_TOKEN: ${SERVER_HEALTH_API_TOKEN}
     volumes:
       - /mnt/media/monitoring/data:/data
     networks:
