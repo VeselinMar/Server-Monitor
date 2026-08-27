@@ -36,3 +36,14 @@ export const settings = {
 export const status = {
   get: () => api.get("/network/status").then((r) => r.data),
 };
+
+export const serverHealth = {
+  latest: () => api.get("/server/health/latest").then((r) => r.data),
+
+  history: (from_dt, to_dt) =>
+    api
+      .get("/server/health/history", {
+        params: { from_dt, to_dt },
+      })
+      .then((r) => r.data),
+};

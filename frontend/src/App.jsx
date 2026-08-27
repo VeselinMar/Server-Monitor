@@ -1,5 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { speedtest, connectivity, status } from "./api/client";
+import {
+  speedtest,
+  connectivity,
+  status,
+  serverHealth,
+} from "./api/client";
+import ServerHealthCards from "./components/ServerHealthCards";
 import SettingsModal from "./components/SettingsModal";
 import { presetRange, toISO } from "./utils/dates";
 import StatCard from "./components/StatCard";
@@ -25,6 +31,7 @@ export default function App() {
   const [speedCounts, setSpeedCounts] = useState({ successful: 0, failed: 0, total: 0 });
   const [connCounts, setConnCounts] = useState({ online: 0, offline: 0, total: 0 });
   const [latest, setLatest] = useState(null);
+  const [serverHealthLatest, setServerHealthLatest] = useState(null);
   const [incidents, setIncidents] = useState([]);
 
   const [loading, setLoading] = useState(false);
@@ -53,11 +60,20 @@ export default function App() {
         speedtest.latest(),
         speedtest.incidents(fromISO, toISO_),
       ]);
+
+      let health = null;
+
+      try {
+        health = await serverHealth.latest();
+      } catch {
+        // Server health is optional; keep the network dashboard working.
+      }
       setSpeedHistory({ results: sortByTime(sh.results), failures: sortByTime(sh.failures) });
       setConnHistory(sortByTime(ch));
       setSpeedCounts(sc);
       setConnCounts(cc);
       setLatest(lat);
+      setServerHealthLatest(health);
       setIncidents(inc);
     } catch (e) {
       setError("Failed to fetch data. Is the backend running?");
@@ -133,6 +149,8 @@ export default function App() {
       {error && <div className="error-banner">{error}</div>}
 
       <main className="main">
+        <ServerHealthCards health={serverHealthLatest} />
+
         <section className="stat-row">
           <StatCard
             label="Download"
