@@ -9,8 +9,10 @@ import {
   Legend,
 } from "recharts";
 
+import { parseUTCTimestamp } from "../utils/dates";
+
 const formatTime = (value) =>
-  new Date(value).toLocaleTimeString([], {
+  parseUTCTimestamp(value).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -36,7 +38,11 @@ export default function ServerHealthChart({ history }) {
   }
 
   const data = [...history]
-    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+    .sort(
+      (a, b) =>
+        parseUTCTimestamp(a.timestamp) -
+        parseUTCTimestamp(b.timestamp)
+    )
     .map((item) => ({
       ...item,
       memory_percent:
@@ -44,7 +50,9 @@ export default function ServerHealthChart({ history }) {
           ? (item.memory_used_bytes / item.memory_total_bytes) * 100
           : null,
       disk_percent:
-        item.filesystems?.find((fs) => fs.mountpoint === "/")?.percent ?? null,
+        item.filesystems?.find(
+          (fs) => fs.mountpoint === "/"
+        )?.percent ?? null,
     }));
 
   return (
@@ -59,7 +67,10 @@ export default function ServerHealthChart({ history }) {
       <div className="server-health-chart">
         <ResponsiveContainer width="100%" height={320}>
           <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="#e5e7eb"
+            />
 
             <XAxis
               dataKey="timestamp"
@@ -84,7 +95,7 @@ export default function ServerHealthChart({ history }) {
 
             <Tooltip
               labelFormatter={(value) =>
-                new Date(value).toLocaleString()
+                parseUTCTimestamp(value).toLocaleString()
               }
               formatter={(value, name) => {
                 if (name === "Temperature") {

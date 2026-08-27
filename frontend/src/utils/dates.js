@@ -12,13 +12,18 @@ export function presetRange(hours) {
 }
 
 export function toISO(date) {
-  return format(date, "yyyy-MM-dd'T'HH:mm:ss");
+  return date.toISOString();
+}
+
+function parseUTCTimestamp(ts) {
+  const normalized = ts.endsWith("Z") ? ts : `${ts}Z`;
+  return parseISO(normalized);
 }
 
 export function fmtTimestamp(ts) {
-  return format(parseISO(ts), "MMM d, HH:mm");
+  return format(parseUTCTimestamp(ts), "MMM d, HH:mm");
 }
 
 export function fmtDate(ts) {
-  return format(parseISO(ts), "MMM d");
+  return format(parseUTCTimestamp(ts), "MMM d");
 }
