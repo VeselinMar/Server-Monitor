@@ -10,9 +10,16 @@ import {
 } from "recharts";
 import { fmtTimestamp } from "../utils/dates";
 
+const MAX_REASONABLE_LATENCY_MS = 5000;
+
+const isValidLatency = (value) =>
+  Number.isFinite(value) &&
+  value >= 0 &&
+  value <= MAX_REASONABLE_LATENCY_MS;
+
 const percentile = (values, p) => {
   const sorted = values
-    .filter((value) => Number.isFinite(value))
+    .filter(Number.isFinite)
     .slice()
     .sort((a, b) => a - b);
 
@@ -38,22 +45,21 @@ const getLatencyDomain = (data) => {
     point.connLatency,
   ]);
 
-  const clean = values.filter(
-    (value) => Number.isFinite(value) && value >= 0
-  );
+  const clean = values.filter(isValidLatency);
 
   if (!clean.length) {
     return [0, 100];
   }
 
-  // Ignore extreme outliers when determining the visual scale.
   const p95 = percentile(clean, 0.95);
 
   if (!Number.isFinite(p95) || p95 <= 0) {
     return [0, 100];
   }
 
-  // Give the chart some breathing room above the normal range.
+  // Keep the chart focused on normal latency while
+  // leaving some breathing room above the highest
+  // normal value.
   const upper = Math.max(p95 * 1.2, 10);
 
   return [0, upper];
@@ -86,7 +92,10 @@ export default function PingChart({
     ...speedResults.map((r) => ({
       time: fmtTimestamp(r.timestamp),
       ts: new Date(r.timestamp),
-      speedPing: r.ping,
+
+      // Ignore pathological speedtest ping values.
+      speedPing: isValidLatency(r.ping) ? r.ping : null,
+
       connLatency: null,
     })),
 
@@ -95,8 +104,13 @@ export default function PingChart({
       .map((c) => ({
         time: fmtTimestamp(c.timestamp),
         ts: new Date(c.timestamp),
+
         speedPing: null,
-        connLatency: c.latency_ms,
+
+        // Ignore pathological connectivity RTT values.
+        connLatency: isValidLatency(c.latency_ms)
+          ? c.latency_ms
+          : null,
       })),
   ].sort((a, b) => a.ts - b.ts);
 
@@ -125,8 +139,7 @@ export default function PingChart({
 
   const data = Array.from(seen.values());
 
-  // Calculate the scale from the actual displayed data.
-  // A single extreme outage therefore won't flatten the normal graph.
+  // Calculate the Y-axis from valid, displayable latency values only.
   const latencyDomain = getLatencyDomain(data);
 
   return (

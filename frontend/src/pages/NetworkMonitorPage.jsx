@@ -125,13 +125,6 @@ export default function NetworkMonitorPage() {
     fetchData();
   }, [fetchData]);
 
-
-
-  // Re-fetch when the selected time range changes.
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
   function handlePreset(hours) {
     setPreset(hours);
     setCustomFrom(null);
