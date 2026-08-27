@@ -13,6 +13,10 @@ from sqlalchemy.orm import sessionmaker
 from datetime import datetime, date, timedelta
 
 from core.database import Base
+import os
+
+os.environ["SERVER_HEALTH_API_TOKEN"] = "test-server-health-token"
+
 from main import app
 
 
@@ -62,13 +66,28 @@ def client(db):
 
     Each route module defines its own local get_db, so we override each one.
     """
-    from api.routes import speedtest, connectivity, summary, report
+    from api.routes import (
+    speedtest,
+    connectivity,
+    summary,
+    report,
+    server_health,
+)
     from api.routes import settings as settings_route
+
 
     def override_get_db():
         yield db
 
-    for module in [speedtest, connectivity, summary, report, settings_route]:
+    for module in [
+        speedtest,
+        connectivity,
+        summary,
+        report,
+        settings_route,
+        server_health,
+    ]:
+
         app.dependency_overrides[module.get_db] = override_get_db
 
     with TestClient(app) as c:

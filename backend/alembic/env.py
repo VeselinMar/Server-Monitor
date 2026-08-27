@@ -13,6 +13,8 @@ from models.speedtest import SpeedTestResult, SpeedTestFailure
 from models.connectivity import ConnectivityCheck
 from models.daily_summary import DailySummary
 from models.settings import Setting
+from models.server_health import ServerHealth
+
 
 
 # this is the Alembic Config object, which provides

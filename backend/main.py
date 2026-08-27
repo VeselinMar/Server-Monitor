@@ -24,5 +24,3 @@ app.include_router(api_router)
 def read_root():
     """Return a simple status message confirming the API is reachable."""
     return {"status": "API running"}
-
-app.include_router(api_router)
