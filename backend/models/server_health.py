@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, DateTime, BigInteger
+from sqlalchemy import Column, Integer, Float, DateTime, BigInteger, JSON
 
 from core.database import Base
 
@@ -20,12 +20,19 @@ class ServerHealth(Base):
     load_1 = Column(Float, nullable=True)
     load_5 = Column(Float, nullable=True)
     load_15 = Column(Float, nullable=True)
+    cpu_per_core_percent = Column(JSON, nullable=True)
+    cpu_frequency_mhz = Column(Float, nullable=True)
+
 
     # Memory
     memory_total_bytes = Column(BigInteger, nullable=True)
+    memory_used_bytes = Column(BigInteger, nullable=True)
     memory_available_bytes = Column(BigInteger, nullable=True)
+    memory_cached_bytes = Column(BigInteger, nullable=True)
     swap_total_bytes = Column(BigInteger, nullable=True)
     swap_used_bytes = Column(BigInteger, nullable=True)
+    swap_sin_bytes = Column(BigInteger, nullable=True)
+    swap_sout_bytes = Column(BigInteger, nullable=True)
 
     # Temperature
     cpu_package_temp_c = Column(Float, nullable=True)

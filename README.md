@@ -23,6 +23,47 @@ Network monitoring scripts write raw CSV data to `/mnt/media/monitoring/data/`. 
 
 The server health collector runs as a host-level systemd oneshot service every minute. It collects host metrics using `psutil` and submits them to the backend through the authenticated `/server/health` API endpoint.
 
+The server health API returns filesystem information together with the parent health sample. This allows each health snapshot to contain both host-wide metrics and per-filesystem capacity/inode information.
+
+#### Collected Metrics
+
+The collector currently reports:
+
+- CPU utilisation, per-core utilisation, frequency, and load averages
+- Memory and swap usage
+- CPU package/core temperatures
+- Disk I/O counters, IOPS, and utilisation
+- Network traffic, errors, and drops
+- System uptime
+- Filesystem capacity and inode utilisation
+
+Filesystem information is collected for each mounted filesystem and includes:
+
+- Mount point
+- Total capacity
+- Used capacity
+- Available capacity
+- Capacity utilisation percentage
+- Total inodes
+- Used inodes
+- Free inodes
+- Inode utilisation percentage
+
+Filesystem metrics are persisted in the `server_health_filesystems` table and associated with the parent `server_health` record.
+
+Filesystem health evaluation is currently handled independently from metric collection. Capacity and inode utilisation use the following thresholds:
+
+| Status | Usage |
+|---|---|
+| OK | < 80% |
+| WARNING | ≥ 80% and < 90% |
+| CRITICAL | ≥ 90% |
+
+A missing percentage is treated as `OK`. This is particularly relevant for filesystems such as `/boot/efi` where inode statistics may not be available.
+
+Capacity and inode health are evaluated independently. A filesystem can therefore have a different capacity status and inode status.
+
+
 The server health collector uses a dedicated Python virtual environment at `/home/vesko/Server-Monitor/.venv/`. Its dependencies are intentionally kept outside the Docker containers because the collector monitors the host itself.
 
 The Docker containers and the host collector communicate through the server's HTTP interface. The server health endpoint is protected by a shared API token.
@@ -335,7 +376,8 @@ backend/
 │   ├── connectivity.py              # ConnectivityCheck
 │   ├── daily_summary.py             # DailySummary
 │   ├── settings.py                  # Setting (key-value store)
-│   └── server_health.py             # Server health data
+│   ├── server_health.py             # Server health data
+│   └── server_health_filesystem.py  # Filesystem data
 ├── repositories/
 │   ├── speedtest_repository.py
 │   ├── connectivity_repository.py
@@ -354,7 +396,8 @@ backend/
 │   ├── ingest_connectivity.py
 │   ├── aggregation_service.py
 │   ├── report_service.py
-│   └── server_health_service.py
+│   ├── server_health_service.py
+│   └── filesystem_health_service.py
 └── tests/
     ├── conftest.py
     ├── test_ingest.py
@@ -531,16 +574,37 @@ App available at `http://localhost:5173`. Requires the backend to be running sep
 | Method | Path | Description |
 |---|---|---|
 | POST | `/health` | Submit host server health metrics |
+| GET | `/health/latest` | Return the most recent server health sample |
+| GET | `/health/history?from_dt=&to_dt=` | Return server health samples within a time range |
 
 The server health submission endpoint requires the Authorization header:
 
-```
+```text
 Authorization: Bearer <SERVER_HEALTH_API_TOKEN>
 ```
 
-A successful submission returns HTTP 200. Requests with a missing or invalid token return HTTP 401.
+A successful submission returns HTTP 201. Requests with a missing or invalid token return HTTP 401.
 
-The endpoint is intended for the host-level `server_health_monitor.py` collector and is not currently consumed by the frontend.
+The latest and history endpoints return filesystem information nested inside each server health sample.
+
+Example filesystem entry:
+{
+    "id": 1,
+    "server_health_id": 7,
+    "mountpoint": "/",
+    "total_bytes": 502821715968,
+    "used_bytes": 216513978368,
+    "available_bytes": 260690714624,
+    "percent": 45.4,
+    "inode_total": 31252480,
+    "inode_used": 1280044,
+    "inode_free": 29972436,
+    "inode_percent": 4.1
+}
+
+Filesystem entries are ordered by mount point. Health samples returned by the history endpoint are ordered chronologically.
+
+The endpoint is intended for the host-level server_health_monitor.py collector and is not currently consumed by the frontend.
 
 ## Performance Classification
 
@@ -608,9 +672,46 @@ Aggregated per-day records covering both speedtest and connectivity metrics. Gen
 
 ### `server_health`
 
-Host-level metrics submitted by `server_health_monitor.py`. The server health model stores the metrics collected by the host collector and is separate from the network speed/connectivity records.
+Point-in-time host-level metrics submitted by `server_health_monitor.py`.
 
-The collector is designed to provide a foundation for future frontend server monitoring features.
+The table stores:
+
+- CPU utilisation, per-core utilisation, frequency, and load averages
+- Memory and swap metrics
+- CPU temperatures
+- Disk I/O metrics
+- Network traffic, errors, and drops
+- System uptime
+
+Filesystem metrics are intentionally stored in a separate table rather than as JSON inside `server_health`.
+
+### `server_health_filesystems`
+
+Per-filesystem capacity and inode metrics associated with a `server_health` sample.
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | Integer | Primary key |
+| `server_health_id` | Integer | Foreign key to `server_health.id` |
+| `mountpoint` | String | Filesystem mount point |
+| `total_bytes` | BigInteger | Total filesystem capacity |
+| `used_bytes` | BigInteger | Used filesystem capacity |
+| `available_bytes` | BigInteger | Available filesystem capacity |
+| `percent` | Float | Capacity utilisation percentage |
+| `inode_total` | BigInteger | Total inodes, when available |
+| `inode_used` | BigInteger | Used inodes, when available |
+| `inode_free` | BigInteger | Free inodes, when available |
+| `inode_percent` | Float | Inode utilisation percentage, when available |
+
+Each health sample can have zero or more filesystem records.
+
+For example, a host may report:
+
+```text
+server_health id=7
+    ├── /           → 45.4% capacity, 4.1% inodes
+    └── /boot/efi   → 6.5% capacity, inode metrics unavailable
+
 
 ### `settings`
 
@@ -627,6 +728,9 @@ Key-value store for subscriber details and service thresholds. Defaults are appl
 - Server health is host-level — the collector runs outside Docker so that it can observe the actual host system rather than the resource usage of an individual container.
 - Server health authentication is token-based — the real token is stored outside the repository in `/etc/servermonitor/server-health.env` and is passed to the backend through Docker Compose.
 - Systemd units are version-controlled — `systemd/server-health-monitor.service`, `systemd/server-health-monitor.timer`, and `systemd/server-health.env.example` are maintained in the repository. The real environment file is deliberately excluded from version control.
-- Frontend server health integration is pending — the backend currently accepts and stores host metrics, but the React dashboard does not yet display them.
+- Frontend server health integration is pending — the backend currently accepts, stores, and exposes host metrics through the server health API, but the React dashboard does not yet display them.
+- Server health filesystem metrics are normalised into `server_health_filesystems` rather than stored inside the parent health record.
+- Filesystem capacity and inode utilisation are evaluated independently using `OK`, `WARNING`, and `CRITICAL` status thresholds.
+- Filesystem status evaluation is deliberately separate from metric collection. The collector records measurements; the backend service evaluates their health status.
 - Layered backend — routes → services → repositories. Query logic lives in the repository layer only.
 - Alembic owns the schema — `Base.metadata.create_all()` is not used. All schema changes go through versioned migrations in `backend/alembic/versions/`.

@@ -10,6 +10,7 @@ from schemas.server_health import (
     ServerHealthCreate,
     ServerHealthResponse,
 )
+from models.server_health_filesystem import ServerHealthFilesystem
 from services import server_health_service
 
 
@@ -58,12 +59,30 @@ def create_health(
     health: ServerHealthCreate,
     db: Session = Depends(get_db),
 ):
-    server_health = ServerHealth(**health.model_dump())
+    filesystem_data = health.filesystems
 
-    return server_health_service.create(
+    health_data = health.model_dump(
+        exclude={"filesystems"}
+    )
+
+    server_health = ServerHealth(**health_data)
+
+    server_health_service.create(
         db,
         server_health,
     )
+
+    for filesystem in filesystem_data:
+        db.add(
+            ServerHealthFilesystem(
+                server_health_id=server_health.id,
+                **filesystem,
+            )
+        )
+
+    db.commit()
+
+    return server_health
 
 
 @router.get(

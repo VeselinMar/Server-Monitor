@@ -294,6 +294,103 @@ def get_uptime() -> float | None:
     except (AttributeError, OSError):
         return None
 
+def get_filesystem_usage() -> list[dict]:
+    """
+    Return usage information for mounted local filesystems.
+
+    Filesystems that are pseudo, temporary, read-only system mounts,
+    or otherwise unsuitable for capacity monitoring are skipped.
+
+    Each entry contains:
+        mountpoint,
+        total_bytes,
+        used_bytes,
+        available_bytes,
+        percent,
+        inode_total,
+        inode_used,
+        inode_free,
+        inode_percent
+    """
+
+    filesystems: list[dict] = []
+
+    try:
+        partitions = psutil.disk_partitions(all=False)
+    except (AttributeError, OSError):
+        return filesystems
+
+    for partition in partitions:
+        mountpoint = partition.mountpoint
+        fstype = partition.fstype.lower()
+
+        # Skip virtual/system filesystems that don't represent
+        # useful storage capacity.
+        if fstype in {
+            "proc",
+            "sysfs",
+            "devtmpfs",
+            "devpts",
+            "tmpfs",
+            "cgroup",
+            "cgroup2",
+            "overlay",
+            "squashfs",
+            "autofs",
+        }:
+            continue
+
+        try:
+            usage = psutil.disk_usage(mountpoint)
+        except (PermissionError, OSError):
+            continue
+
+        entry = {
+            "mountpoint": mountpoint,
+            "total_bytes": usage.total,
+            "used_bytes": usage.used,
+            "available_bytes": usage.free,
+            "percent": usage.percent,
+            "inode_total": None,
+            "inode_used": None,
+            "inode_free": None,
+            "inode_percent": None,
+        }
+
+        try:
+            stat = os.statvfs(mountpoint)
+
+            inode_total = stat.f_files
+            inode_free = stat.f_ffree
+            inode_used = max(
+                0,
+                inode_total - inode_free,
+            )
+
+            if inode_total > 0:
+                inode_percent = (
+                    inode_used
+                    / inode_total
+                    * 100
+                )
+            else:
+                inode_percent = None
+
+            entry["inode_total"] = inode_total
+            entry["inode_used"] = inode_used
+            entry["inode_free"] = inode_free
+            entry["inode_percent"] = round(
+                inode_percent,
+                2,
+            ) if inode_percent is not None else None
+
+        except (OSError, AttributeError):
+            pass
+
+        filesystems.append(entry)
+
+    return filesystems
+
 
 def collect_snapshot() -> dict:
     """
@@ -305,9 +402,33 @@ def collect_snapshot() -> dict:
 
     # CPU
     try:
-        cpu_percent = psutil.cpu_percent(interval=0.1)
+        cpu_per_core_percent = psutil.cpu_percent(
+            interval=0.1,
+            percpu=True,
+        )
+
+        if cpu_per_core_percent:
+            cpu_percent = (
+                sum(cpu_per_core_percent)
+                / len(cpu_per_core_percent)
+            )
+        else:
+            cpu_percent = None
+
     except (AttributeError, OSError):
         cpu_percent = None
+        cpu_per_core_percent = None
+
+    try:
+        frequency = psutil.cpu_freq()
+
+        if frequency is None:
+            cpu_frequency_mhz = None
+        else:
+            cpu_frequency_mhz = frequency.current
+
+    except (AttributeError, OSError):
+        cpu_frequency_mhz = None
 
     try:
         load_1, load_5, load_15 = psutil.getloadavg()
@@ -316,27 +437,37 @@ def collect_snapshot() -> dict:
         load_5 = None
         load_15 = None
 
+
     # Memory
     try:
         memory = psutil.virtual_memory()
 
         memory_total = memory.total
+        memory_used = memory.used
         memory_available = memory.available
+        memory_cached = getattr(memory, "cached", None)
 
     except (AttributeError, OSError):
         memory_total = None
+        memory_used = None
         memory_available = None
-
+        memory_cached = None
+        
     # Swap
     try:
         swap = psutil.swap_memory()
 
         swap_total = swap.total
         swap_used = swap.used
+        swap_sin = getattr(swap, "sin", None)
+        swap_sout = getattr(swap, "sout", None)
 
     except (AttributeError, OSError):
         swap_total = None
         swap_used = None
+        swap_sin = None
+        swap_sout = None
+
 
     # CPU temperature
     (
@@ -361,19 +492,31 @@ def collect_snapshot() -> dict:
     # System
     uptime_seconds = get_uptime()
 
+    # Filesystems
+    filesystems = get_filesystem_usage()
+
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
 
         "cpu_percent": cpu_percent,
+        "cpu_per_core_percent": cpu_per_core_percent,
+        "cpu_frequency_mhz": cpu_frequency_mhz,
+
         "load_1": load_1,
         "load_5": load_5,
         "load_15": load_15,
 
+
         "memory_total_bytes": memory_total,
+        "memory_used_bytes": memory_used,
         "memory_available_bytes": memory_available,
+        "memory_cached_bytes": memory_cached,
 
         "swap_total_bytes": swap_total,
         "swap_used_bytes": swap_used,
+        "swap_sin_bytes": swap_sin,
+        "swap_sout_bytes": swap_sout,
+
 
         "cpu_package_temp_c": cpu_package_temp,
         "cpu_core0_temp_c": cpu_core0_temp,
@@ -397,6 +540,8 @@ def collect_snapshot() -> dict:
         "network_tx_drops": network_tx_drops,
 
         "uptime_seconds": uptime_seconds,
+
+        "filesystems": filesystems,
     }
 
 
