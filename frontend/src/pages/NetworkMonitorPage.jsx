@@ -221,7 +221,6 @@ export default function NetworkMonitorPage() {
           />
 
           <PingChart
-            speedResults={speedHistory.results}
             connectivityChecks={connHistory}
           />
 

@@ -6,20 +6,12 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
 } from "recharts";
 import { fmtTimestamp } from "../utils/dates";
 
-const MAX_REASONABLE_LATENCY_MS = 5000;
-
-const isValidLatency = (value) =>
-  Number.isFinite(value) &&
-  value >= 0 &&
-  value <= MAX_REASONABLE_LATENCY_MS;
-
 const percentile = (values, p) => {
   const sorted = values
-    .filter(Number.isFinite)
+    .filter((value) => Number.isFinite(value))
     .slice()
     .sort((a, b) => a - b);
 
@@ -40,29 +32,23 @@ const percentile = (values, p) => {
 };
 
 const getLatencyDomain = (data) => {
-  const values = data.flatMap((point) => [
-    point.speedPing,
-    point.connLatency,
-  ]);
+  const values = data
+    .map((point) => point.latency)
+    .filter(
+      (value) => Number.isFinite(value) && value >= 0
+    );
 
-  const clean = values.filter(isValidLatency);
-
-  if (!clean.length) {
+  if (!values.length) {
     return [0, 100];
   }
 
-  const p95 = percentile(clean, 0.95);
+  const p95 = percentile(values, 0.95);
 
   if (!Number.isFinite(p95) || p95 <= 0) {
     return [0, 100];
   }
 
-  // Keep the chart focused on normal latency while
-  // leaving some breathing room above the highest
-  // normal value.
-  const upper = Math.max(p95 * 1.2, 10);
-
-  return [0, upper];
+  return [0, Math.max(p95 * 1.2, 10)];
 };
 
 function CustomTooltip({ active, payload, label }) {
@@ -72,74 +58,32 @@ function CustomTooltip({ active, payload, label }) {
     <div className="chart-tooltip">
       <p className="tooltip-label">{label}</p>
 
-      {payload.map((p) => (
-        <p key={p.dataKey} style={{ color: p.color }}>
-          {p.name}:{" "}
-          <strong>
-            {p.value != null ? `${p.value.toFixed(1)} ms` : "—"}
-          </strong>
-        </p>
-      ))}
+      <p style={{ color: "#db2777" }}>
+        Connectivity RTT:{" "}
+        <strong>
+          {payload[0].value != null
+            ? `${payload[0].value.toFixed(1)} ms`
+            : "—"}
+        </strong>
+      </p>
     </div>
   );
 }
 
-export default function PingChart({
-  speedResults,
-  connectivityChecks,
-}) {
-  const merged = [
-    ...speedResults.map((r) => ({
-      time: fmtTimestamp(r.timestamp),
-      ts: new Date(r.timestamp),
+export default function PingChart({ connectivityChecks }) {
+  const data = connectivityChecks
+    .filter(
+      (c) =>
+        c.latency_ms != null &&
+        Number.isFinite(Number(c.latency_ms))
+    )
+    .map((c) => ({
+      time: fmtTimestamp(c.timestamp),
+      ts: new Date(c.timestamp),
+      latency: Number(c.latency_ms),
+    }))
+    .sort((a, b) => a.ts - b.ts);
 
-      // Ignore pathological speedtest ping values.
-      speedPing: isValidLatency(r.ping) ? r.ping : null,
-
-      connLatency: null,
-    })),
-
-    ...connectivityChecks
-      .filter((c) => c.latency_ms != null)
-      .map((c) => ({
-        time: fmtTimestamp(c.timestamp),
-        ts: new Date(c.timestamp),
-
-        speedPing: null,
-
-        // Ignore pathological connectivity RTT values.
-        connLatency: isValidLatency(c.latency_ms)
-          ? c.latency_ms
-          : null,
-      })),
-  ].sort((a, b) => a.ts - b.ts);
-
-  // Merge entries with the same formatted timestamp.
-  const seen = new Map();
-
-  for (const entry of merged) {
-    if (!seen.has(entry.time)) {
-      seen.set(entry.time, {
-        time: entry.time,
-        speedPing: null,
-        connLatency: null,
-      });
-    }
-
-    const point = seen.get(entry.time);
-
-    if (entry.speedPing != null) {
-      point.speedPing = entry.speedPing;
-    }
-
-    if (entry.connLatency != null) {
-      point.connLatency = entry.connLatency;
-    }
-  }
-
-  const data = Array.from(seen.values());
-
-  // Calculate the Y-axis from valid, displayable latency values only.
   const latencyDomain = getLatencyDomain(data);
 
   return (
@@ -147,7 +91,7 @@ export default function PingChart({
       <h2 className="chart-title">Ping & Latency</h2>
 
       <p className="chart-sub">
-        Milliseconds over time · speedtest ping vs connectivity check RTT
+        Connectivity round-trip time over the selected period
       </p>
 
       <ResponsiveContainer width="100%" height={280}>
@@ -186,28 +130,14 @@ export default function PingChart({
 
           <Tooltip content={<CustomTooltip />} />
 
-          <Legend />
-
           <Line
             type="monotone"
-            dataKey="speedPing"
-            name="Speedtest ping"
-            stroke="#7c3aed"
-            strokeWidth={2}
-            dot={false}
-            activeDot={{ r: 4 }}
-            connectNulls={false}
-          />
-
-          <Line
-            type="monotone"
-            dataKey="connLatency"
+            dataKey="latency"
             name="Connectivity RTT"
             stroke="#db2777"
             strokeWidth={2}
             dot={false}
             activeDot={{ r: 4 }}
-            connectNulls={false}
           />
         </LineChart>
       </ResponsiveContainer>
