@@ -7,7 +7,7 @@ const formatBytes = (bytes) => {
 
   while (value >= 1024 && unit < units.length - 1) {
     value /= 1024;
-    unit++;
+    unit += 1;
   }
 
   return `${value.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
@@ -30,10 +30,32 @@ const percentage = (used, total) => {
   return (used / total) * 100;
 };
 
-function HealthCard({ label, value, unit, sub, accent }) {
+function HealthCard({
+  label,
+  value,
+  unit,
+  sub,
+  accent,
+  progress,
+  detail,
+  className = "",
+  children,
+}) {
   return (
-    <div className="health-card" style={{ "--health-accent": accent }}>
-      <div className="health-card-label">{label}</div>
+    <article
+      className={`health-card ${className}`}
+      style={{ "--health-accent": accent }}
+    >
+      <div className="health-card-top">
+        <div className="health-card-label">
+          <span className="health-card-dot" />
+          {label}
+        </div>
+
+        {detail && (
+          <span className="health-card-detail">{detail}</span>
+        )}
+      </div>
 
       <div className="health-card-value">
         {value ?? "—"}
@@ -42,8 +64,23 @@ function HealthCard({ label, value, unit, sub, accent }) {
         )}
       </div>
 
-      <div className="health-card-sub">{sub}</div>
-    </div>
+      {children || (
+        <>
+          <div className="health-card-sub">{sub}</div>
+
+          {progress != null && (
+            <div className="health-card-progress">
+              <div
+                className="health-card-progress-fill"
+                style={{
+                  width: `${Math.min(Math.max(progress, 0), 100)}%`,
+                }}
+              />
+            </div>
+          )}
+        </>
+      )}
+    </article>
   );
 }
 
@@ -51,10 +88,12 @@ export default function ServerHealthCards({ health }) {
   if (!health) {
     return (
       <section className="server-health-section">
-        <div className="section-heading">
+        <div className="health-empty-state">
+          <span className="health-empty-dot" />
+
           <div>
             <h2>Server Health</h2>
-            <p>No server health data available</p>
+            <p>No server health data available.</p>
           </div>
         </div>
       </section>
@@ -66,23 +105,31 @@ export default function ServerHealthCards({ health }) {
     health.memory_total_bytes,
   );
 
-  const filesystem = health.filesystems ?? [];
+  const filesystems = health.filesystems ?? [];
 
-  const rootFilesystem = filesystem.find(
-    (fs) => fs.mountpoint === "/",
+  const rootFilesystem = filesystems.find(
+    (filesystem) => filesystem.mountpoint === "/",
   );
 
   return (
     <section className="server-health-section">
-      <div className="section-heading">
+      <div className="health-section-meta">
         <div>
-          <h2>Server Health</h2>
-          <p>
-            Last updated{" "}
+          <div className="health-section-label">SERVER HEALTH</div>
+
+          <div className="health-section-status">
+            <span className="health-status-dot" />
+            System operating normally
+          </div>
+        </div>
+
+        <div className="health-updated">
+          <span>LAST UPDATED</span>
+          <strong>
             {health.timestamp
               ? new Date(health.timestamp).toLocaleString()
               : "—"}
-          </p>
+          </strong>
         </div>
       </div>
 
@@ -93,10 +140,12 @@ export default function ServerHealthCards({ health }) {
           unit="%"
           sub={
             health.cpu_package_temp_c != null
-              ? `${health.cpu_package_temp_c.toFixed(0)}°C`
+              ? `${health.cpu_package_temp_c.toFixed(0)}°C package temperature`
               : "Temperature unavailable"
           }
+          progress={health.cpu_percent}
           accent="#2563eb"
+          detail="PROCESSOR"
         />
 
         <HealthCard
@@ -110,27 +159,42 @@ export default function ServerHealthCards({ health }) {
                 )}`
               : "Memory data unavailable"
           }
+          progress={memoryPercent}
           accent="#7c3aed"
+          detail="RAM"
         />
 
         <HealthCard
           label="Load"
           value={health.load_1?.toFixed(2)}
-          unit=""
-          sub={
-            health.load_5 != null && health.load_15 != null
-              ? `5m ${health.load_5.toFixed(2)} · 15m ${health.load_15.toFixed(2)}`
-              : "Load data unavailable"
-          }
           accent="#f59e0b"
-        />
+          detail="SYSTEM"
+          className="health-card-load"
+        >
+          <div className="load-metrics">
+            <div>
+              <span>1 MIN</span>
+              <strong>{health.load_1?.toFixed(2) ?? "—"}</strong>
+            </div>
+
+            <div>
+              <span>5 MIN</span>
+              <strong>{health.load_5?.toFixed(2) ?? "—"}</strong>
+            </div>
+
+            <div>
+              <span>15 MIN</span>
+              <strong>{health.load_15?.toFixed(2) ?? "—"}</strong>
+            </div>
+          </div>
+        </HealthCard>
 
         <HealthCard
           label="Uptime"
           value={formatUptime(health.uptime_seconds)}
-          unit=""
           sub="System uptime"
           accent="#16a34a"
+          detail="RUNTIME"
         />
 
         <HealthCard
@@ -144,7 +208,9 @@ export default function ServerHealthCards({ health }) {
                 )}`
               : "Filesystem data unavailable"
           }
+          progress={rootFilesystem?.percent}
           accent="#db2777"
+          detail="/"
         />
       </div>
     </section>
