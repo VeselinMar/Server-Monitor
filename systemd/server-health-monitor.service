@@ -1,0 +1,12 @@
+[Unit]
+Description=ServerMonitor server health collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=vesko
+WorkingDirectory=/home/vesko/Server-Monitor
+EnvironmentFile=/etc/servermonitor/server-health.env
+ExecStart=/home/vesko/Server-Monitor/.venv/bin/python /home/vesko/Server-Monitor/scripts/server_health_monitor.py
+
