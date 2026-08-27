@@ -704,3 +704,262 @@ body {
 @media (max-width: 600px) {
   .settings-field { grid-template-columns: 1fr; }
 }
+
+
+/* ── Header navigation ── */
+
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.header-nav-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-2);
+  border-radius: 6px;
+  padding: 7px 11px;
+  font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.header-nav-btn:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.header-nav-btn.active {
+  color: var(--text);
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+
+/* ── Server Health page ── */
+
+.server-health-page {
+  gap: 24px;
+}
+
+.server-health-page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.page-eyebrow {
+  margin-bottom: 6px;
+  color: var(--text-3);
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.server-health-page-header h1 {
+  font-family: 'Libre Baskerville', serif;
+  font-size: 28px;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+.server-health-page-header p {
+  margin-top: 6px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.refresh-btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 8px 14px;
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+
+.refresh-btn:hover {
+  background: var(--surface-2);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.health-history-panel,
+.filesystem-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+
+.health-history-panel .section-heading,
+.filesystem-panel .section-heading {
+  margin-bottom: 18px;
+}
+
+.server-health-chart-section {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+}
+
+.server-health-chart-section .section-heading {
+  display: none;
+}
+
+.server-health-chart {
+  width: 100%;
+  min-height: 320px;
+}
+
+/* ── Filesystems ── */
+
+.filesystem-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.filesystem-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 16px 0;
+  border-top: 1px solid var(--border);
+}
+
+.filesystem-row:first-child {
+  border-top: 0;
+}
+
+.filesystem-info {
+  min-width: 180px;
+}
+
+.filesystem-info strong {
+  display: block;
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+}
+
+.filesystem-info span {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-3);
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+}
+
+.filesystem-usage {
+  display: grid;
+  grid-template-columns: minmax(160px, 360px) 60px auto;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.filesystem-bar {
+  height: 7px;
+  overflow: hidden;
+  background: #ebe8e3;
+  border-radius: 999px;
+}
+
+.filesystem-bar-fill {
+  height: 100%;
+  background: var(--pink);
+  border-radius: inherit;
+}
+
+.filesystem-usage > span {
+  color: var(--text-2);
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.empty-state {
+  padding: 28px 0;
+  color: var(--text-3);
+  text-align: center;
+}
+
+.back-network-btn {
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  padding: 4px 0;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.back-network-btn:hover {
+  color: var(--text);
+}
+
+@media (max-width: 800px) {
+  .header-nav-btn {
+    padding: 6px 7px;
+    font-size: 11px;
+  }
+
+  .header-sub {
+    display: none;
+  }
+
+  .server-health-page-header {
+    align-items: flex-start;
+  }
+
+  .filesystem-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .filesystem-usage {
+    width: 100%;
+    grid-template-columns: minmax(120px, 1fr) 50px;
+  }
+
+  .filesystem-usage > span {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 550px) {
+  .header {
+    padding: 0 16px;
+  }
+
+  .header-title {
+    font-size: 15px;
+  }
+
+  .header-left {
+    gap: 8px;
+  }
+
+  .header-right {
+    gap: 4px;
+  }
+
+  .gear-btn {
+    padding: 6px;
+  }
+
+  .server-health-page-header {
+    flex-direction: column;
+  }
+}
