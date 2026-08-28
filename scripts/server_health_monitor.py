@@ -11,7 +11,7 @@ import urllib.request
 from datetime import datetime, timezone
 
 import psutil
-
+from smart_monitor import collect_smart_health
 
 API_URL = os.getenv(
     "SERVER_HEALTH_API_URL",
@@ -495,6 +495,9 @@ def collect_snapshot() -> dict:
     # Filesystems
     filesystems = get_filesystem_usage()
 
+    # SMART
+    smart_devices = collect_smart_health()
+
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
 
@@ -542,6 +545,8 @@ def collect_snapshot() -> dict:
         "uptime_seconds": uptime_seconds,
 
         "filesystems": filesystems,
+
+        "smart_devices": smart_devices,
     }
 
 

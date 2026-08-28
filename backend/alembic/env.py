@@ -14,7 +14,8 @@ from models.connectivity import ConnectivityCheck
 from models.daily_summary import DailySummary
 from models.settings import Setting
 from models.server_health import ServerHealth
-
+from models.server_health_filesystem import ServerHealthFilesystem
+from models.server_health_smart_device import ServerHealthSmartDevice
 
 
 # this is the Alembic Config object, which provides

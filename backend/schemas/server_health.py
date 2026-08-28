@@ -51,6 +51,10 @@ class ServerHealthCreate(BaseModel):
     # Filesystem
     filesystems: list[dict[str, Any]] = Field(default_factory=list)
 
+    smart_devices: list[dict[str, Any]] = Field(
+        default_factory=list
+    )
+
 
 
 class ServerHealthFilesystemResponse(BaseModel):
@@ -73,6 +77,23 @@ class ServerHealthFilesystemResponse(BaseModel):
     inode_free: int | None = None
     inode_percent: float | None = None
 
+
+class ServerHealthSmartDeviceResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    server_health_id: int
+
+    device: str
+    model: str | None = None
+
+    temperature_c: float | None = None
+
+    reallocated_sectors: int | None = None
+    pending_sectors: int | None = None
+    uncorrectable_sectors: int | None = None
+
+    power_on_hours: int | None = None
 
 
 class ServerHealthResponse(BaseModel):
@@ -128,4 +149,9 @@ class ServerHealthResponse(BaseModel):
     # Filesystem
     filesystems: list[ServerHealthFilesystemResponse] = Field(
         default_factory=list
+    )
+
+    # SMART
+    smart_devices: list[ServerHealthSmartDeviceResponse] = Field(
+    default_factory=list
     )

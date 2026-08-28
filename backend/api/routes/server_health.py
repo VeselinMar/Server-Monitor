@@ -11,6 +11,7 @@ from schemas.server_health import (
     ServerHealthResponse,
 )
 from models.server_health_filesystem import ServerHealthFilesystem
+from models.server_health_smart_device import ServerHealthSmartDevice
 from services import server_health_service
 
 
@@ -60,9 +61,13 @@ def create_health(
     db: Session = Depends(get_db),
 ):
     filesystem_data = health.filesystems
+    smart_device_data = health.smart_devices
 
     health_data = health.model_dump(
-        exclude={"filesystems"}
+        exclude={
+            "filesystems",
+            "smart_devices",
+        }
     )
 
     server_health = ServerHealth(**health_data)
@@ -79,6 +84,15 @@ def create_health(
                 **filesystem,
             )
         )
+    
+    for smart_device in smart_device_data:
+        db.add(
+            ServerHealthSmartDevice(
+                server_health_id=server_health.id,
+                **smart_device,
+            )
+        )
+
 
     db.commit()
 

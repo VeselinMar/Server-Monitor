@@ -2,9 +2,10 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from models.server_health_filesystem import ServerHealthFilesystem
-from services.filesystem_health_service import apply_status
 from models.server_health import ServerHealth
+from models.server_health_filesystem import ServerHealthFilesystem
+from models.server_health_smart_device import ServerHealthSmartDevice
+from services.filesystem_health_service import apply_status
 
 
 def create(db: Session, health: ServerHealth) -> ServerHealth:
@@ -19,7 +20,8 @@ def create(db: Session, health: ServerHealth) -> ServerHealth:
 
 def get_latest(db: Session) -> ServerHealth | None:
     """
-    Return the most recent server health sample.
+    Return the most recent server health sample,
+    including filesystem and SMART device information.
     """
     health = (
         db.query(ServerHealth)
@@ -30,6 +32,7 @@ def get_latest(db: Session) -> ServerHealth | None:
     if health is None:
         return None
 
+    # Load filesystem information.
     health.filesystems = (
         db.query(ServerHealthFilesystem)
         .filter(
@@ -38,12 +41,21 @@ def get_latest(db: Session) -> ServerHealth | None:
         .order_by(ServerHealthFilesystem.mountpoint.asc())
         .all()
     )
+
     for filesystem in health.filesystems:
         apply_status(filesystem)
 
+    # Load SMART information.
+    health.smart_devices = (
+        db.query(ServerHealthSmartDevice)
+        .filter(
+            ServerHealthSmartDevice.server_health_id == health.id
+        )
+        .order_by(ServerHealthSmartDevice.device.asc())
+        .all()
+    )
 
     return health
-
 
 
 def get_history(
@@ -54,6 +66,9 @@ def get_history(
     """
     Return server health samples within the specified time range,
     ordered chronologically.
+
+    Filesystem and SMART device information is loaded for each
+    health sample.
     """
     health_samples = (
         db.query(ServerHealth)
@@ -67,6 +82,10 @@ def get_history(
         return []
 
     health_ids = [health.id for health in health_samples]
+
+    # ---------------------------------------------------------
+    # Load filesystems
+    # ---------------------------------------------------------
 
     filesystems = (
         db.query(ServerHealthFilesystem)
@@ -88,13 +107,46 @@ def get_history(
             [],
         ).append(filesystem)
 
+    # ---------------------------------------------------------
+    # Load SMART devices
+    # ---------------------------------------------------------
+
+    smart_devices = (
+        db.query(ServerHealthSmartDevice)
+        .filter(
+            ServerHealthSmartDevice.server_health_id.in_(health_ids)
+        )
+        .order_by(
+            ServerHealthSmartDevice.server_health_id.asc(),
+            ServerHealthSmartDevice.device.asc(),
+        )
+        .all()
+    )
+
+    smart_devices_by_health_id: dict[int, list] = {}
+
+    for smart_device in smart_devices:
+        smart_devices_by_health_id.setdefault(
+            smart_device.server_health_id,
+            [],
+        ).append(smart_device)
+
+    # ---------------------------------------------------------
+    # Attach related data to health samples
+    # ---------------------------------------------------------
+
     for health in health_samples:
         health.filesystems = filesystems_by_health_id.get(
             health.id,
             [],
         )
-    
+
         for filesystem in health.filesystems:
             apply_status(filesystem)
+
+        health.smart_devices = smart_devices_by_health_id.get(
+            health.id,
+            [],
+        )
 
     return health_samples
