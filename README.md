@@ -6,6 +6,7 @@ ServerMonitor is a self-hosted network and server health monitor built to docume
 
 - **Download & Upload Speed** — performance zones and threshold lines
 - **Incident Table** — grouped outage and degradation events with severity highlighting
+- **Server Health** — CPU, memory, disk, temperature and historical health data
 - **Settings Modal** — subscriber details and service thresholds
 
 ## Architecture
@@ -274,6 +275,22 @@ Server health submitted successfully
 
 The service is expected to become inactive (dead) after a successful run because it is a oneshot service. The timer remains active and starts it again at the next scheduled interval.
 
+## Time Handling
+
+Server-side timestamps are stored and generated in UTC.
+
+The server health collector uses timezone-aware UTC timestamps. The API may
+serialise database timestamps without an explicit `Z` suffix, but these
+timestamps represent UTC.
+
+The frontend normalises server timestamps as UTC before parsing, sorting, and
+displaying them. User-facing timestamps are displayed in the browser's local
+timezone.
+
+Custom `datetime-local` inputs represent local browser time. They are converted
+to JavaScript `Date` objects before being sent to the API.
+
+
 ## Log Rotation
 
 Logs are rotated monthly via `logrotate`, keeping 24 months of history. Rotated files are gzip-compressed and named `speedtest.csv.1.gz`, `connectivity.csv.1.gz` etc. The ingest service only reads the active CSV — compressed archives are not ingested automatically. Since raw records older than 7 days are aggregated and deleted, any data in a rotated archive that fell within the last 7 days of the previous month will not be captured. This is a known limitation.
@@ -487,15 +504,15 @@ frontend/
     │   └── client.js                # Axios instance and typed API calls
     └── components/
         ├── StatCard.jsx             # Single metric display card
-        ├── TimeRangeSelector.jsx    # Preset (24h / 7d) and custom range picker
-        ├── SpeedChart.jsx            # Download/upload time series with performance zones
-        ├── PingChart.jsx             # Ping latency time series
-        ├── UptimeChart.jsx           # Donut charts for connectivity and speedtest uptime
-        ├── IncidentTable.jsx         # Grouped incident log with severity highlighting
-        ├── SummarySection.jsx        # Historical data section with range toggle and PDF export
-        ├── SummaryChart.jsx           # Grouped bar + line chart over daily summaries
-        ├── SummaryStats.jsx           # Five summary stat cards (outage time, avg speed, etc.)
-        └── SettingsModal.jsx          # Gear icon modal for subscriber details and thresholds
+        ├── TimeRangeSelector.jsx    # Preset (24h / 7d) and custom range ├── ├── ServerHealthChart.jsx    # CPU, memory, disk, temperature history
+        ├── SpeedChart.jsx           # Download/upload time series with performance zones
+        ├── PingChart.jsx            # Ping latency time series
+        ├── UptimeChart.jsx          # Donut charts for connectivity and speedtest uptime
+        ├── IncidentTable.jsx        # Grouped incident log with severity highlighting
+        ├── SummarySection.jsx       # Historical data section with range toggle and PDF export
+        ├── SummaryChart.jsx         # Grouped bar + line chart over daily summaries
+        ├── SummaryStats.jsx         # Five summary stat cards (outage time, avg speed, etc.)
+        └── SettingsModal.jsx        # Gear icon modal for subscriber details and thresholds
 ```
 
 ### Component Overview
@@ -514,7 +531,14 @@ frontend/
 
 `SettingsModal` opens from the ⚙ gear button in the header. Two sections — Subscriber Details (used in the PDF report) and Service Thresholds (used for classification). An "Auto-derive from contracted speed" button computes degraded (50%) and critical (20%) thresholds automatically. Saving persists to the backend and closes the modal after a brief confirmation flash.
 
-The server health API is currently backend-only. Host metrics are collected and persisted through the server health API, but they are not yet represented in the React frontend. A future frontend integration will expose these metrics through dedicated dashboard components.
+The server health API is integrated with the React frontend. Host metrics are
+collected every minute by the host-level systemd collector and displayed in
+the Server Health dashboard.
+
+The dashboard displays CPU utilisation, memory utilisation, root filesystem
+utilisation, CPU temperature, and historical server health data. Historical
+health data can be viewed using the 24-hour, 7-day, or custom time-range
+selector.
 
 ### Local Development
 
@@ -604,7 +628,10 @@ Example filesystem entry:
 
 Filesystem entries are ordered by mount point. Health samples returned by the history endpoint are ordered chronologically.
 
-The endpoint is intended for the host-level server_health_monitor.py collector and is not currently consumed by the frontend.
+The POST endpoint is used by the host-level `server_health_monitor.py`
+collector. The GET endpoints are consumed by the React frontend for the
+Server Health dashboard.
+
 
 ## Performance Classification
 
@@ -728,7 +755,13 @@ Key-value store for subscriber details and service thresholds. Defaults are appl
 - Server health is host-level — the collector runs outside Docker so that it can observe the actual host system rather than the resource usage of an individual container.
 - Server health authentication is token-based — the real token is stored outside the repository in `/etc/servermonitor/server-health.env` and is passed to the backend through Docker Compose.
 - Systemd units are version-controlled — `systemd/server-health-monitor.service`, `systemd/server-health-monitor.timer`, and `systemd/server-health.env.example` are maintained in the repository. The real environment file is deliberately excluded from version control.
-- Frontend server health integration is pending — the backend currently accepts, stores, and exposes host metrics through the server health API, but the React dashboard does not yet display them.
+The server health API is integrated with the React frontend. Host metrics are
+collected every minute by the host-level systemd collector and displayed in
+the Server Health dashboard.
+- The dashboard displays CPU utilisation, memory utilisation, root filesystem
+utilisation, CPU temperature, and historical server health data. Historical
+health data can be viewed using the 24-hour, 7-day, or custom time-range
+selector.
 - Server health filesystem metrics are normalised into `server_health_filesystems` rather than stored inside the parent health record.
 - Filesystem capacity and inode utilisation are evaluated independently using `OK`, `WARNING`, and `CRITICAL` status thresholds.
 - Filesystem status evaluation is deliberately separate from metric collection. The collector records measurements; the backend service evaluates their health status.
