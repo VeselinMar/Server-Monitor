@@ -37,23 +37,23 @@ export default function ServerHealthChart({ history }) {
     );
   }
 
-  const data = [...history]
-    .sort(
-      (a, b) =>
-        parseUTCTimestamp(a.timestamp) -
-        parseUTCTimestamp(b.timestamp)
-    )
-    .map((item) => ({
-      ...item,
-      memory_percent:
-        item.memory_total_bytes
-          ? (item.memory_used_bytes / item.memory_total_bytes) * 100
-          : null,
-      disk_percent:
-        item.filesystems?.find(
-          (fs) => fs.mountpoint === "/"
-        )?.percent ?? null,
-    }));
+const data = [...history]
+  .sort(
+    (a, b) =>
+      parseUTCTimestamp(a.timestamp) -
+      parseUTCTimestamp(b.timestamp)
+  )
+  .map((item) => ({
+    ...item,
+    memory_percent:
+      item.memory_total_bytes
+        ? (item.memory_used_bytes / item.memory_total_bytes) * 100
+        : null,
+    disk_percent:
+      item.filesystems?.find(
+        (fs) => fs.mountpoint === "/"
+      )?.percent ?? null,
+  }));
 
   return (
     <section className="chart-section server-health-chart-section">

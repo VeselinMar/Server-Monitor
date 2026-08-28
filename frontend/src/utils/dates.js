@@ -16,15 +16,32 @@ export function toISO(date) {
 }
 
 export function parseUTCTimestamp(ts) {
+  if (!ts) return null;
+
   const normalized = ts.endsWith("Z") ? ts : `${ts}Z`;
-  return new Date(normalized);
+
+  return parseISO(normalized);
 }
 
 export function fmtTimestamp(ts) {
-  const normalized = ts.endsWith("Z") ? ts : `${ts}Z`;
-  return format(parseISO(normalized), "MMM d, HH:mm");
+  return format(parseUTCTimestamp(ts), "MMM d, HH:mm");
 }
 
 export function fmtDate(ts) {
-  return format(parseISO(ts), "MMM d");
+  return format(parseUTCTimestamp(ts), "MMM d");
+}
+
+export function toDateTimeLocal(date) {
+  const pad = (n) => String(n).padStart(2, "0");
+
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+  ].join("-") +
+    "T" +
+    [
+      pad(date.getHours()),
+      pad(date.getMinutes()),
+    ].join(":");
 }

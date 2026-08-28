@@ -1,3 +1,6 @@
+import { parseUTCTimestamp } from "../utils/dates";
+
+
 const formatBytes = (bytes) => {
   if (bytes == null) return "—";
 
@@ -127,7 +130,7 @@ export default function ServerHealthCards({ health }) {
           <span>LAST UPDATED</span>
           <strong>
             {health.timestamp
-              ? new Date(health.timestamp).toLocaleString()
+              ? parseUTCTimestamp(health.timestamp).toLocaleString()
               : "—"}
           </strong>
         </div>
