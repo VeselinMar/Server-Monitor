@@ -739,7 +739,7 @@ server_health id=7
     ├── /           → 45.4% capacity, 4.1% inodes
     └── /boot/efi   → 6.5% capacity, inode metrics unavailable
 
-
+```
 ### `settings`
 
 Key-value store for subscriber details and service thresholds. Defaults are applied at read time for any key not yet stored in the database.
@@ -767,3 +767,40 @@ selector.
 - Filesystem status evaluation is deliberately separate from metric collection. The collector records measurements; the backend service evaluates their health status.
 - Layered backend — routes → services → repositories. Query logic lives in the repository layer only.
 - Alembic owns the schema — `Base.metadata.create_all()` is not used. All schema changes go through versioned migrations in `backend/alembic/versions/`.
+
+
+### SMART Disk Health Monitoring
+Server Monitor includes optional, best-effort SMART disk health collection through `smartctl`.
+
+SMART data is not required for normal server-health monitoring. If `smartctl` is unavailable, a disk cannot be accessed, or the underlying storage/controller does not expose usable SMART data, SMART collection is skipped without affecting the rest of the health report.
+
+### Deployment-specific limitation
+On the production `servermonitor` host, the system disk (/dev/sda, TEAM T253X2512G SATA SSD) is detected by smartctl, but ATA SMART data cannot be retrieved through the available SATA/SAT interface.
+
+Tests with:
+```
+- smartctl --scan-open
+- smartctl -a /dev/sda
+- smartctl -a -d sat /dev/sda
+- smartctl -a -d ata /dev/sda
+- smartctl -a -d sat,12 /dev/sg1
+- smartctl -a -d sat,16 /dev/sg1
+- smartctl -a -T permissive -d sat,12 /dev/sg1
+```
+did not provide usable ATA SMART attributes.
+
+Consequently, the production server may report:
+```
+"smart_devices": []
+```
+This is expected and does not indicate a disk failure.
+
+The server-health collector continues to monitor storage through filesystem and disk I/O metrics, including:
+
+    disk read/write bytes
+    read/write IOPS
+    disk utilization
+    filesystem capacity
+    filesystem inode usage
+
+SMART collection remains in the codebase because it is useful on systems where the storage hardware exposes SMART data, but it should be considered an optional enhancement rather than a required health metric.
